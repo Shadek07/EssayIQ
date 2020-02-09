@@ -7,3 +7,6 @@ gensim_bigram.py is for converting any dataset containing sentence data into mea
 Each of these python files (gensim_bigram, gensim_trigram, gensim_4gram) has training of word2vec on the processed n-gram data.
 
 For our purpose we used word2vec training after 4-gram processing at the end of gensim_4gram.py file.
+
+## The order of execution of python files
+gensim_bigram.py -> gensim_trigram.py -> gensim_4gram.py
