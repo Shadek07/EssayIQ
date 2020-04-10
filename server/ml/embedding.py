@@ -22,7 +22,7 @@ class EmbeddingModel:
           split = line.split(' ')
           self.dictionary[split[0]] = len(self.vocabulary)
           self.vocabulary.append(split[0])
-          numbers.append([float(x) for x in split[2:]]) #split[1:]
+          numbers.append([float(x) for x in split[1:]]) #split[1:]
 
     self.embeddings = np.array(numbers, dtype=np.float32)
     self._cache = cache.LRUCache(cache_capacity)

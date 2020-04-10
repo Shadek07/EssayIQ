@@ -1,0 +1,50 @@
+<div class="container">
+
+  <div class="row">
+    <div class="col-md-12">
+      <a href="/#/submissions" ng-href="/#/submissions" class="btn btn-default pull-right"><i class="fa fa-reply"></i> Go Back </a>
+      <!-- <a  target="_self" ng-href="{{download_url}}" class="btn btn-default pull-right"><i class="fa fa-download"></i> Download as JSON </a> -->
+
+      <div class="panel panel-default">
+          <div class="panel-body">
+              <div ng-repeat="dataitem in data">
+                   <h2>Submitted essay: ({{dataitem.submissionname}})</h2>
+                    <essayannotate annotation="annotation" sentences="dataitem.sentences" submissionname= "dataitem.submissionname" assignmentid="assignmentID" themes="dataitem.themes"> </essayannotate>
+                    <h4>Themes to look for:</h4>
+                      <li ng-repeat="theme in themes">
+                          <span  title="Theme Sentences: {{theme.themeSentences}}" style="background-color: {{theme.color}}"> {{theme.themeName}}</span>
+                      </li>
+              </div>
+          </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div>
+    <script type="text/ng-template" id="annotateSentence.html">
+        <div class="modal-header">
+            <h4 class="modal-title"> Submission: {{source.submissionname}} </h4>
+        </div>
+        <div class="modal-body">
+            <div class="panel panel-default">
+                <div class="panel-body">
+                      <!--<select ng-change="themechange({{selectedTheme}})" ng-model="selectedTheme">
+                        <option value="">--Select Theme--</option>
+                        <option ng-repeat="theme in themes" value="{{theme.id}}">{{theme.themeName}}</option>
+                      </select> -->
+                  <div> <h4> Sentence: </h4> {{source.selectedsentence}} </div>
+                  <div> <br> </div>
+                      <select name="sourcetheme" ng-model="source.selectedtheme" ng-options="theme.id as theme.themeName for theme in themes">
+                            <option value="">-- choose theme --</option>
+                      </select>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" ng-click="save()">Save</button>
+            <button class="btn btn-warning" ng-click="cancel()">Cancel</button>
+        </div>
+    </script>
+</div>
+<!--   {{selectedTheme}}-->

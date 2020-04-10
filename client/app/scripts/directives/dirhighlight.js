@@ -43,7 +43,7 @@ angular.module('conceptvectorApp')
                                         var myTooltip = "Negative\nScore: " + myKeyword.score;
 
                                         commentWord.updated = '<span class="highlightedNegative" tooltip-placement="top" uib-tooltip="' + myTooltip + '">' + commentWord.original + '</span>';
-                         
+
 
                                     }
                                     commentWord.isUpdated = true;
@@ -54,7 +54,7 @@ angular.module('conceptvectorApp')
                         var output = inputData.map(function(d) {
                             return d.updated;
                         }).join(" ");
-                        
+
                         element.html(output);
 
                         $compile(element.contents())(scope);
@@ -63,9 +63,6 @@ angular.module('conceptvectorApp')
                     	element.html(scope.input);
                     	$compile(element.contents())(scope);
                     }
-
-
-
                 });
 
             }

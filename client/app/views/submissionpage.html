@@ -1,0 +1,21 @@
+<div class="container">
+  <uib-alert type="success" ng-show="fileSuccess">Essay is submitted successfully </uib-alert>
+  <div class="row">
+    <div class="col-md-12">
+      <h2>Submit Essay</h2>
+      <a href="/#/submissions" ng-href="/#/submissions" class="btn btn-default pull-right"><i class="fa fa-reply"></i> Go Back </a>
+      <!-- <a  target="_self" ng-href="{{download_url}}" class="btn btn-default pull-right"><i class="fa fa-download"></i> Download as JSON </a> -->
+      <a class="btn btn-default pull-right" ng-click="submitAssignment()"><i class="fa fa-save" ></i> Submit Essay </a>
+      <h3> Assignment name {{selectedAssignment}} </h3>
+      <select ng-model="selectedAssignment">
+        <option value="">--Select Assignment--</option>
+        <option ng-repeat="assignment in assignment_list" value="{{assignment.id}}">{{assignment.name}}</option>
+      </select>
+      <h3> Submission name {{submission_name}} </h3>
+      <input class="form-control" type="text" ng-model="submission_name" placeholder="Submission Name">
+      <h3> Essay Body </h3>
+      <textarea cols="80" rows="15" ng-model="submission_body" placeholder="Enter essay content here"/>
+      <a class="btn btn-default pull-right" ng-click="submitAssignment()"><i class="fa fa-save" ></i> Submit Essay </a>
+    </div>
+  </div>
+</div>

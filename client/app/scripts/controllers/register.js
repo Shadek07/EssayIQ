@@ -18,6 +18,7 @@ angular.module('conceptvectorApp')
                 $scope.disabled = true;
 
                 // call register from service
+                //line 106 in authservice.js
                 AuthService.register($scope.registerForm.name,
                 		$scope.registerForm.email,
                         $scope.registerForm.password)
@@ -34,8 +35,6 @@ angular.module('conceptvectorApp')
                         $scope.disabled = false;
                         $scope.registerForm = {};
                     });
-
             };
-
         }
     ]);

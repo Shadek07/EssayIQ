@@ -1,0 +1,4 @@
+{'assignmentid': 1, 'submissionname': '0.txt', 'sentenceindex': 0, 'selectedtheme': 3}
+{'assignmentid': 1, 'submissionname': '0.txt', 'sentenceindex': 2, 'selectedtheme': 5}
+{'assignmentid': 1, 'submissionname': '0.txt', 'sentenceindex': 5, 'selectedtheme': 5}
+{'assignmentid': 1, 'submissionname': '1.txt', 'sentenceindex': 6, 'selectedtheme': 5}

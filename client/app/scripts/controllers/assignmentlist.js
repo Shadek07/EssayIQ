@@ -2,27 +2,25 @@
 
 /**
  * @ngdoc function
- * @name conceptvectorApp.controller:ConceptlistCtrl
+ * @name conceptvectorApp.controller:AssignmentlistCtrl
  * @description
- * # ConceptlistCtrl
+ * # AssignmentlistCtrl
  * Controller of the conceptvectorApp
  */
 angular.module('conceptvectorApp')
-    .controller('ConceptlistCtrl', ['$scope', '$http', 'serverURL', 'AuthService', '$uibModal', function($scope, $http, serverURL, AuthService, $uibModal) {
-
-        $scope.concepts = ['hello'];
+    .controller('AssignmentlistCtrl', ['$scope', '$http', 'serverURL', 'AuthService', '$uibModal', function($scope, $http, serverURL, AuthService, $uibModal) {
         $scope.currentPage = 1;
         $scope.pageSize = 10;
 
-        $scope.concepts = [];
+        $scope.assignments = [];
 
-        var loadConcepts = function() {
-            $http.get(serverURL + '/concepts', {withCredentials: true, contentType : "application/json"})
+        var loadAssignments = function() {
+            $http.get(serverURL + '/assignments', {withCredentials: true, contentType : "application/json"})
                 // handle success
                 .success(function(data) {
-                    console.log(data);
-
-                    $scope.concepts = data;
+                    //console.log(data);
+                    console.log('assignment load success')
+                    $scope.assignments = data;
                     // $scope.$apply();
                 })
                 // handle error
@@ -31,13 +29,11 @@ angular.module('conceptvectorApp')
                 });
 
         };
-
-
-        $scope.isOwner = function(concept) {
+        $scope.isOwner = function(assignment) {
 
             if (AuthService.isLoggedIn()) {
 
-                if (AuthService.getUserId() === concept.creator_id) {
+                if (AuthService.getUserId() === assignment.creator_id) {
                     return true;
                 }
             }
@@ -46,25 +42,26 @@ angular.module('conceptvectorApp')
 
         };
 
-        $scope.delete = function(concept) {
+        $scope.delete = function(assignment) {
+
             var modalInstance = $uibModal.open({
                 templateUrl: 'deleteModal.html',
                 controller: 'deleteModalCtrl',
                 size: 'sm',
                 resolve: {
-                    conceptName: function() {
-                        return concept.name;
+                    assignmentName: function() {
+                        return assignment.name;
                     }
                 }
             });
 
             modalInstance.result.then(function() {
 
-                $http.get(serverURL + '/concept_delete/' + concept.id, {withCredentials: true, contentType : "application/json"})
+                $http.get(serverURL + '/assignment_delete/' + assignment.id, {withCredentials: true, contentType : "application/json"})
                     // handle success
                     .success(function(data) {
 
-                        $scope.concepts = data;
+                        $scope.assignments = data;
                         // $scope.$apply();
                     })
                     // handle error
@@ -78,35 +75,35 @@ angular.module('conceptvectorApp')
 
         };
 
-        $scope.clone = function(concept) {
+        $scope.clone = function(assignment) {
 
             var modalInstance = $uibModal.open({
                 templateUrl: 'cloneModal.html',
                 controller: 'cloneModalCtrl',
                 size: 'sm',
                 resolve: {
-                    conceptName: function() {
-                        return concept.name;
+                    assignmentName: function() {
+                        return assignment.name;
                     }
                 }
             });
 
-            modalInstance.result.then(function(newConceptName) {
+            modalInstance.result.then(function(newAssignmentName) {
 
-                var newConcept = {};
+                var newAssignment = {};
 
-                newConcept = angular.copy(concept);
+                newAssignment = angular.copy(concept);
 
-                newConcept.name = newConceptName;
+                newAssignment.name = newAssignmentName;
 
-                $http.post(serverURL + '/concepts', newConcept, {withCredentials: true, contentType : "application/json"})
+                $http.post(serverURL + '/assignments', newAssignment, {withCredentials: true, contentType : "application/json"})
                     // handle success
                     .success(function(data) {
                         console.log(data);
 
                         // $scope.concepts = data.data;
                         // $scope.$apply();
-                        loadConcepts();
+                        loadAssignments();
 
                     })
                     // handle error
@@ -120,10 +117,7 @@ angular.module('conceptvectorApp')
             });
 
         };
-
-        loadConcepts();
-
-
+        loadAssignments();
     }]);
 
 angular.module('conceptvectorApp')

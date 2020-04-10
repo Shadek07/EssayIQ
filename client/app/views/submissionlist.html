@@ -1,6 +1,6 @@
 <div class="container">
-    <h1>List of Concepts</h1>
-    <h1><small>You can add, update or delete custom concepts for text analysis</small></h1>
+    <h1>List of Submissions</h1>
+    <!-- <h1><small>You can create, update or delete assignments</small></h1> -->
     <div class="row">
         <div class="col-sm-12">
             <div class="row">
@@ -16,8 +16,8 @@
                         </div>
                         <div class="col-xs-4">
                             <!-- <h3>Concepts: {{ currentPage }}</h3> -->
-                            <a class="btn btn-default pull-right" ng-href="/#/concepts/new"><i class="fa fa-plus"></i>
-                                Create New Concept
+                            <a class="btn btn-default pull-right" ng-href="/#/submissions/new"><i class="fa fa-plus"></i>
+                                Submit new essay
                             </a>
                         </div>
                     </div>
@@ -29,29 +29,40 @@
                     </div> -->
                     <div class="panel panel-default">
                         <div class="panel-body">
+                              <h3> Assignment-wise whole analysis: </h3>
+                              <select ng-model="selectedAssignment">
+                                <option value="">--Select Assignment--</option>
+                                <option ng-repeat="assignment in assignments" value="{{assignment.assignmentID}}">{{assignment.name}}</option>
+                              </select>
+                        </div>
+                        <a class="btn btn-default" ng-if="checkIfAssignmentSelected()" ng-href="{{'/#/wholesubmissions/'+ selectedAssignment}}"><i class="fa fa-plus"></i>
+                                Analyze whole submissions
+                        </a>
+                        <a class="btn btn-default" ng-if="checkIfAssignmentSelected()" ng-href="{{'/#/annotatewholesubmissions/'+ selectedAssignment}}"><i class="fa fa-plus"></i>
+                                Annotate whole submissions
+                        </a>
+                    </div>
+                    <div class="panel panel-default">
+                        <div class="panel-body">
                             <!--                             <ul>
                                 <li dir-paginate="concept in concepts | filter:q | itemsPerPage: pageSize" current-page="currentPage" pagination-id="drinksPagination">{{ concept }}</li>
 
                             </ul> -->
                             <dl>
-                                <dt dir-paginate-start="concept in concepts | filter:q | itemsPerPage: pageSize" current-page="currentPage" pagination-id="drinksPagination">
-                                    <h3> <a href="#/concepts/{{concept.id}}"> {{concept.name}} </a><small class="commentHeader">                                     <a href="#/concepts/{{concept.id}}" class="btn btn-link btn-default" ng-show="isOwner(concept)">Edit</a>
-                                    <a href="" class="btn btn-link btn-default" ng-click="clone(concept)">Copy</a>
-                                    <a href="" class="btn btn-link btn-default" ng-click="delete(concept)" ng-show="isOwner(concept)">Delete</a> </small> </h3>
+                                <dt dir-paginate-start="submission in submissions | filter:q | itemsPerPage: pageSize" current-page="currentPage" pagination-id="drinksPagination">
                                 </dt>
-                                {{concept}}
+                                {{submission}}
                                 <dd dir-paginate-end>
+                                    <a class="btn btn-default pull-right" ng-href="{{'/#/submissions/'+submission.submissionID + '/'+submission.assignmentID}}"><i class="fa fa-plus"></i>
+                                        Analyze this essay
+                                    </a>
                                     <dl class="dl-horizontal">
-                                        <dt>Author</dt>
-                                        <dd>{{concept.creator_name}}</dd>
-                                        <dt>Type</dt>
-                                        <dd>{{concept.concept_type}}</dd>
-                                        <dt>Positive Terms</dt>
-                                        <dd> <span ng-repeat="term in concept.input_terms.positive ">{{term.text}} </span></dd>
-                                        <div ng-if="concept.concept_type == 'bipolar'">
-                                            <dt>Negative Terms</dt>
-                                            <dd><span ng-repeat="term in concept.input_terms.negative ">{{term.text}} </span></dd>
-                                        </div>
+                                         <dt>Submission Name </dt>
+                                         <dd>{{submission.submissionName}}</dd>
+                                         <dt>Submitted for </dt>
+                                        <dd>Assignment: {{submission.name}}</dd>
+                                        <dt>Submitted Essay</dt>
+                                        <dd> {{submission.submissionBody}}</dd>
                                     </dl>
                                     <div>
                                         <hr>
@@ -71,10 +82,10 @@
 </div>
 <script type="text/ng-template" id="deleteModal.html">
     <div class="modal-header">
-        <h4 class="modal-title">Are you sure to delete this concept? </h4>
+        <h4 class="modal-title">Are you sure to delete this assignment? </h4>
     </div>
     <div class="modal-body">
-        <h3> {{conceptName}} </h3>
+        <h3> {{assignmentName}} </h3>
     </div>
     <div class="modal-footer">
         <button class="btn btn-primary" ng-click="ok()">OK</button>
@@ -83,11 +94,11 @@
 </script>
 <script type="text/ng-template" id="cloneModal.html">
     <div class="modal-header">
-        <h3 class="modal-title">Please enter the name for new concept</h3>
+        <h3 class="modal-title">Please enter the name for new assignment</h3>
     </div>
     <div class="modal-body">
         New name:
-        <input type="text" ng-model='conceptName' class="form-control" select-on-click placeholder={{conceptName}}>
+        <input type="text" ng-model='assignmentName' class="form-control" select-on-click placeholder={{assignmentName}}>
     </div>
     <div class="modal-footer">
         <button class="btn btn-primary" ng-click="ok()">OK</button>

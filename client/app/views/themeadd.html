@@ -1,0 +1,32 @@
+<div class="container">
+  <uib-alert type="success" ng-show="fileSuccess">Theme is saved successfully </uib-alert>
+  <div class="row">
+    <div class="col-md-12">
+      <h2>Theme Create</h2>
+      <a href="/#/themes" ng-href="/#/themes" class="btn btn-default pull-right"><i class="fa fa-reply"></i> Go Back </a>
+      <!-- <a  target="_self" ng-href="{{download_url}}" class="btn btn-default pull-right"><i class="fa fa-download"></i> Download as JSON </a> -->
+      <a class="btn btn-default pull-right" ng-click="saveTheme()"><i class="fa fa-save" ></i> Save Theme </a>
+      <h3> Choose assignment for this theme: {{selectedAssignment}} </h3>
+      <select ng-model="selectedAssignment">
+        <option value="">--Select Assignment--</option>
+        <option ng-repeat="assignment in assignment_list" value="{{assignment.id}}">{{assignment.name}}</option>
+      </select>
+      <h3> Theme Name: {{theme_name}} </h3>
+      <input class="form-control" type="text" ng-model="theme_name" placeholder="Enter a name of theme here">
+      <h3> Choose a <span style="background-color:{{selectedColor}}"> unique theme color </span> </h3>
+      <select ng-model="selectedColor">
+        <option value="#ffffff">--Select Color--</option>
+        <option value="#ffff00">Yellow</option>
+        <option value="#7CFC00">Green</option>
+        <option value="#00FFFF">Cyan</option>
+        <option value="##0000FF">Blue</option>
+        <option value="#A9A9A9">Grey</option>
+        <option value="#8A2BE2">Blue Violet</option>
+        <option value="#9B30FF"> Purple</option>
+      </select>
+      <h3> Theme sentences </h3>
+      <textarea cols="50" rows="15" ng-model="theme_sentences" placeholder="Add theme sentences here separated by dots ('.')"/>
+
+    </div>
+  </div>
+</div>

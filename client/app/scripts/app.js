@@ -52,6 +52,45 @@ angular
         controller: 'RegisterCtrl',
         access: {restricted: false}
       })
+      .when('/assignments', {
+        templateUrl: 'views/assignmentlist.html',
+        controller: 'AssignmentlistCtrl',
+        access: {restricted: true}
+      })
+      .when('/assignments/:assignmentId',{
+        templateUrl: 'views/customassignment.html',
+        controller: 'AssignmentdetailCtrl'
+      })
+      .when('/submissions', {
+        templateUrl: 'views/submissionlist.html',
+        controller: 'SubmissionlistCtrl',
+        access: {restricted: false}
+      })
+      .when('/submissions/:submissionId',{
+        templateUrl: 'views/submissionpage.html',
+        controller: 'submissionpageCtrl'
+      })
+      .when('/wholesubmissions/:assignmentID',{
+        templateUrl: 'views/analyzewholesubmissions.html',
+        controller: 'analyzewholesubmissionsCtrl'
+      })
+      .when('/annotatewholesubmissions/:assignmentID',{
+        templateUrl: 'views/annotatewholesubmissions.html',
+        controller: 'annotatewholesubmissionsCtrl'
+      })
+      .when('/submissions/:submissionID/:assignmentID',{
+        templateUrl: 'views/analyzesubmission.html',
+        controller: 'analyzesubmissionCtrl'
+      })
+      .when('/themes', {
+        templateUrl: 'views/themelist.html',
+        controller: 'themelistCtrl',
+        access: {restricted: true}
+      })
+      .when('/themes/:themeId',{
+        templateUrl: 'views/themeadd.html',
+        controller: 'themeAddCtrl'
+      })
       .when('/concepts', {
         templateUrl: 'views/conceptlist.html',
         controller: 'ConceptlistCtrl',
@@ -83,10 +122,17 @@ angular
 
     if (!next.access) {
       return;
-    } 
+    }
     if (next.access.restricted && (AuthService.isLoggedIn() === false)) {
       $location.path('/login');
       $route.reload();
     }
   });
 });
+
+/*
+.when('/themes_filterbyassignment/:assignment_id',{
+        templateUrl: 'views/themeadd.html',
+        controller: 'themeAddCtrl'
+      })
+*/

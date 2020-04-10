@@ -1,0 +1,20 @@
+<div class="container">
+  <uib-alert type="danger" ng-hide="isOwner()">You are viewing this assignment as a guest. Please login and copy this assignment to create a clone and edit.</uib-alert>
+  <uib-alert type="danger" ng-show="fileError">Duplicate name! The assignment name is taken. Please use other assignment name. </uib-alert>
+  <uib-alert type="success" ng-show="fileSuccess">Assignment is saved successfully </uib-alert>
+  <div class="row">
+    <div class="col-md-12">
+       <h2>New Assignment</h2>
+      <a href="/#/assignments" ng-href="/#/assignments" class="btn btn-default pull-right"><i class="fa fa-reply"></i> Go Back </a>
+      <!-- <a  target="_self" ng-href="{{download_url}}" class="btn btn-default pull-right"><i class="fa fa-download"></i> Download as JSON </a> -->
+      <a class="btn btn-default pull-right" ng-click="saveAssignment()" ng-disabled="!isOwner()"><i class="fa fa-save" ></i> Save </a>
+      <h3> Assignment Name: {{assignment_name}} </h3>
+      <input class="form-control" type="text" ng-model="assignment_name" placeholder="Enter a name of assignment here">
+      <h3> Assignment Title: {{assignment_title}} </h3>
+      <input class="form-control" type="text" ng-model="assignment_title" placeholder="Enter a title of assignment here">
+      <h3> Description: </h3>
+      <input class="form-control" type="text" ng-model="assignment_desc" placeholder="Please enter description for this assignment">
+
+    </div>
+  </div>
+</div>

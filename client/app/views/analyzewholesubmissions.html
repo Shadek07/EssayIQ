@@ -1,0 +1,49 @@
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <a href="/#/submissions" ng-href="/#/submissions" class="btn btn-default pull-right"><i class="fa fa-reply"></i> Go Back </a>
+      <!-- <a  target="_self" ng-href="{{download_url}}" class="btn btn-default pull-right"><i class="fa fa-download"></i> Download as JSON </a> -->
+
+      <div class="panel panel-default">
+          <div class="panel-body">
+
+              <div ng-repeat="dataitem in data">
+                   <h2>Highlighted essay: ({{dataitem.submissionName}})</h2>
+                    <essayhighlight callback-function="callback()" submissionname="dataitem.submissionName" sentences="dataitem.sentences" thememarkers="dataitem.themeMarkers" themes="dataitem.themes" colors="dataitem.colors" ts="dataitem.themeSentences" tids="dataitem.themeids"> </essayhighlight>
+                    <h4>Themes to look for:</h4>
+                      <li ng-repeat="theme in themes">
+                          <span  title="Theme Sentences: {{theme.themeSentences}}" style="background-color: {{theme.color}}"> {{theme.themeName}}</span>
+                      </li>
+              </div>
+          </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="text/ng-template" id="changeTheme.html">
+        <div class="modal-header">
+            <h4 class="modal-title"> Submission: {{source.submissionname}} </h4>
+        </div>
+        <div class="modal-body">
+            <div class="panel panel-default">
+                <div class="panel-body">
+                      <!--<select ng-change="themechange({{selectedTheme}})" ng-model="selectedTheme">
+                        <option value="">--Select Theme--</option>
+                        <option ng-repeat="theme in themes" value="{{theme.id}}">{{theme.themeName}}</option>
+                      </select> -->
+                  <div> <h5 style="display:inline;">Theme Sentence belonging to theme</h5> <h4 style="display:inline;">  {{source.themename}}: </h4><br><br> <span style="font-style: italic;"> {{source.selectedthemesentence}} </span> </div>
+                  <div><br> <h4> Essay Sentence: </h4> <span style="font-style: italic;">{{source.selectedsentence}}</span> </div>
+                  <div> <br> <h4>Choose a theme to add this essay sentence:</h4> </div>
+                  <br>
+                      <select name="sourcetheme" ng-model="source.selectedtheme" ng-options="theme.id as theme.themeName for theme in themes">
+                            <option value="-1">-- choose theme --</option>
+                      </select>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" ng-show="source.selectedtheme != -1" ng-click="AddEssaySentence()">Add essay sentence to theme</button>
+            <button class="btn btn-warning" ng-click="DeleteThemeSentence()">Delete this theme sentence</button>
+        </div>
+</script>

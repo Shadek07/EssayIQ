@@ -1,0 +1,29 @@
+<div class="container">
+  <uib-alert type="success" ng-show="fileSuccess">Essay is submitted successfully </uib-alert>
+  <div class="row">
+    <div class="col-md-12">
+      <a href="/#/submissions" ng-href="/#/submissions" class="btn btn-default pull-right"><i class="fa fa-reply"></i> Go Back </a>
+      <!-- <a  target="_self" ng-href="{{download_url}}" class="btn btn-default pull-right"><i class="fa fa-download"></i> Download as JSON </a> -->
+
+      <h2>Highlighted essay: ({{data.submissionName}})</h2>
+      <essayhighlight sentences="data.sentences" thememarkers="dataitem.themeMarkers" themes="dataitem.themes" colors="data.colors" ts="data.themeSentences"> </essayhighlight>
+
+      <h2>Themes to look for:</h2>
+      <li ng-repeat="theme in themes">
+          <span  title="Theme Sentences: {{theme.themeSentences}}" style="background-color: {{theme.color}}"> {{theme.themeName}}</span>
+      </li>
+
+      <!--
+      <dl class="dl-horizontal">
+           <dt>Submission Name </dt>
+           <dd>{{submission.submissionName}}</dd>
+           <dt>Submitted for </dt>
+          <dd>Assignment: {{submission.name}}</dd>
+          <dt>Submitted Essay</dt>
+          <dd> {{submission.submissionBody}}</dd>
+      </dl> -->
+
+    </div>
+  </div>
+</div>
+

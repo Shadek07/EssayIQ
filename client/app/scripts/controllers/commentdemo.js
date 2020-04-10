@@ -95,8 +95,6 @@ $scope.addAlert = function(messageType, messageContent) {
                         $scope.fileError = true;
                         $scope.fileSuccess = false;
                     });
-
-
             };
 
             $scope.loadTags = function(query) {

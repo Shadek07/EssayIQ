@@ -20,37 +20,38 @@ class CRUD():
 
 
 class User(db.Model):
-	__tablename__ = 'users'
+  __tablename__ = 'users'
+  id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+  name = db.Column(db.String(255), nullable=True, default="User")
+  email = db.Column(db.String(255), index=True, unique=True, nullable=False)
+  password = db.Column(db.String(255), nullable=False)
+  registered_on = db.Column(db.DateTime, nullable=False)
+  admin = db.Column(db.Boolean, nullable=False, default=False)
+  concepts = db.relationship('Concepts', backref="users", cascade="all, delete-orphan", lazy="dynamic")
+  assignments = db.relationship('Assignment', backref="users", cascade="all, delete-orphan", lazy="dynamic")
+  submissions = db.relationship('Submission', backref="users", cascade="all, delete-orphan", lazy="dynamic")
 
-	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-	name = db.Column(db.String(255), nullable=True, default="User")
-	email = db.Column(db.String(255), index=True, unique=True, nullable=False)
-	password = db.Column(db.String(255), nullable=False)
-	registered_on = db.Column(db.DateTime, nullable=False)
-	admin = db.Column(db.Boolean, nullable=False, default=False)
-	concepts = db.relationship('Concepts', backref="users", cascade="all, delete-orphan", lazy="dynamic")
+  def __init__(self, name, email, password, admin=False):
+    self.name = name
+    self.email = email
+    self.password = bcrypt.generate_password_hash(password)
+    self.registered_on = datetime.datetime.now()
+    self.admin = admin
 
-	def __init__(self, name, email, password, admin=False):
-		self.name = name
-		self.email = email
-		self.password = bcrypt.generate_password_hash(password)
-		self.registered_on = datetime.datetime.now()
-		self.admin = admin
+  def is_authenticated(self):
+    return True
 
-	def is_authenticated(self):
-		return True
+  def is_active(self):
+    return True
 
-	def is_active(self):
-		return True
+  def is_anonymous(self):
+    return False
 
-	def is_anonymous(self):
-		return False
+  def get_id(self):
+    return self.id
 
-	def get_id(self):
-		return self.id
-
-	def __repr__(self):
-		return '<id {}>'.format(self.id)
+  def __repr__(self):
+    return '<id {}>'.format(self.id)
 
 
 class Concepts(db.Model, CRUD):
@@ -64,7 +65,7 @@ class Concepts(db.Model, CRUD):
 	creator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 	creator = db.relationship("User", back_populates="concepts")
 	creator_name = db.Column(db.String(255), nullable=False)
-	
+
 	concept_type=db.Column(db.String(20), default='bipolar', nullable=False)
 	input_terms=db.Column(JSON)
 
@@ -84,7 +85,7 @@ class Concepts(db.Model, CRUD):
 		return '<id {}>'.format(self.id)
 
 class ConceptsSchema(Schema):
-	
+
 	not_blank = validate.Length(min=1, error='Field cannot be blank')
 	id = fields.Integer(dump_only=False)
 	name = fields.Str()
@@ -94,7 +95,7 @@ class ConceptsSchema(Schema):
 	input_terms = fields.Raw()
 	creator_name = fields.Str()
 	help_text = fields.Str()
-	
+
 	#self links
 	def get_top_level_links(self, data, many):
 		if many:
@@ -149,7 +150,7 @@ class Article(db.Model):
 		return '<URL {}>'.format(self.url)
 
 class ArticleSchema(Schema):
-	
+
 	#self links
 	def get_top_level_links(self, data, many):
 		if many:
@@ -164,7 +165,7 @@ class ArticleSchema(Schema):
 		# url = fields.Str()
 
 		fields = ('id','url','adx_keywords','section','type','title','abstract',
-			'published_date','comments_count','byline','media', 
+			'published_date','comments_count','byline','media',
 			'des_facet','org_facet','per_facet','geo_facet')
 
 
@@ -200,12 +201,12 @@ class Comment(db.Model):
 	userLocation = db.Column(db.String)
 	assetID = db.Column(BIGINT, db.ForeignKey('articles.id'))
 	article = db.relationship("Article", back_populates="comments")
-	
+
 
 	def __init__(self, apiResult, assetID):
 		try:
 			if 'replies' in apiResult:
-				del apiResult['replies'] 
+				del apiResult['replies']
 			self.assetID = assetID
 			for key, value in apiResult.iteritems():
 				setattr(self, key, value)
@@ -225,5 +226,127 @@ class CommentSchema(Schema):
 		  'editorsSelection', 'recommendations','userDisplayName', 'userLocation' )
 
 
+class Assignment(db.Model, CRUD):
+  __tablename__ = 'assignments'
 
+  id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+  name = db.Column(db.String(255), nullable=False, unique=True)
+  title = db.Column(db.String(255))
+  description = db.Column(db.Text)
+  created_on = db.Column(db.DateTime, nullable=False)
+  edited_on = db.Column(db.DateTime, nullable=False)
+  creator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+  creator = db.relationship("User", back_populates="assignments")
+  creator_name = db.Column(db.String(255), nullable=False)
+  submissions = db.relationship('Submission', backref='assignments') #lazy=True
+  themes = db.relationship('Theme', backref='assignments')
+  #submissions = db.relationship('Address', lazy='select', backref=db.backref('person', lazy='joined'))
+
+  def __init__(self, name, title, desc, creator_id, creator_name):
+    self.name = name
+    self.title = title
+    self.description = desc
+    self.creator_id = creator_id
+    self.created_on = datetime.datetime.now()
+    self.edited_on = datetime.datetime.now()
+    self.creator_name = creator_name
+
+  def get_id(self):
+    return self.id
+
+  def __repr__(self):
+    return '<id {}>'.format(self.id)
+
+
+class AssignmentSchema(Schema):
+  not_blank = validate.Length(min=1, error='Field cannot be blank')
+  id = fields.Integer(dump_only=False)
+  name = fields.Str()
+  title = fields.Str()
+  created_on = fields.DateTime()
+  creator_id = fields.Integer()
+  creator_name = fields.Str()
+  description = fields.Str()
+
+  # self links
+  def get_top_level_links(self, data, many):
+    if many:
+      self_link = "/assignments/"
+    else:
+      self_link = "/assignments/{}".format(data['id'])
+    return {'self': self_link}
+
+  class Meta:
+    type_ = 'assignments'
+    fields = ('id', 'name', 'title', 'description', 'created_on', 'creator_id', 'creator_name')
+
+class Theme(db.Model, CRUD):
+  __tablename__ = 'themes'
+  id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+  assignment_id = db.Column(db.Integer, db.ForeignKey('assignments.id'))
+  themeName = db.Column(db.String, unique=True)
+  color = db.Column(db.String)
+  themeSentences = db.Column(db.Text)
+  __table_args__ = (db.UniqueConstraint('assignment_id', 'color'), )
+
+  #themeSentences = db.relationship('ThemeSentence', backref='themes')
+
+  def __init__(self, themeName, themeSentences, assignment_id, color):
+    self.themeName = themeName
+    self.themeSentences = themeSentences
+    self.assignment_id = assignment_id
+    self.color = color
+
+class ThemeSchema(Schema):
+  class Meta:
+    type = 'themes'
+    fields = ('id', 'themeName', 'themeSentences', 'assignment_id', 'color')
+
+class ThemeAssignmentJoinSchema(Schema):
+  class Meta:
+    fields = ('id', 'assignment_id', 'themeName', 'themeSentences', 'name', 'title')
+
+class SubmissionAssignmentJoinSchema(Schema):
+  class Meta:
+    fields = ('submissionID', 'assignmentID', 'submissionName', 'submissionBody', 'name', 'title')
+
+class ThemeSentence(db.Model):
+  __tablename__ = 'themesentences'
+  id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+  sentence = db.Column(db.String)
+  #theme_id = db.Column(db.Integer, db.ForeignKey('themes.id'))
+
+class ThemeSentenceSchema(Schema):
+  class Meta:
+    type='themesentences'
+    fields = ('sentence', 'theme_id')
+
+
+class Submission(db.Model, CRUD):
+  __tablename__ = 'submissions'
+  submissionDate = db.Column(db.String)
+  submissionName = db.Column(db.String)
+  submissionBody = db.Column(db.Text)
+  submissionID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+  userID = db.Column(db.Integer, db.ForeignKey('users.id'))
+  userDisplayName = db.Column(db.String)
+  assignmentID = db.Column(db.Integer, db.ForeignKey('assignments.id'))
+  assignment = db.relationship("Assignment", back_populates="submissions")
+
+  def __init__(self, name, body, assignment, userID, username):
+    self.submissionDate = datetime.datetime.now()
+    self.submissionName = name
+    self.submissionBody = body
+    self.userID = userID
+    self.assignmentID = assignment
+    self.userDisplayName = username
+
+  def __repr__(self):
+    return '<Submissionid {}>'.format(self.submissionID)
+
+class SubmissionSchema(Schema):
+		#self links
+	class Meta:
+		type_ = 'submissions'
+		fields = ('submissionBody','submissionID', 'assignmentID','submissionDate', 'userID', 'userDisplayName')
 

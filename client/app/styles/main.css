@@ -1,6 +1,19 @@
+.highlightAnnotation{
+  background: #A9A9A9;
+}
+//#D3D3D3;
 .new-word {
   color:blue
 }
+
+.themetooltip {
+        border: 1px solid black;
+        margin-left: 58px;
+        margin-top: -35px;
+        background-color: darkcyan;
+        border-radius: 4px;
+        color: white;
+    }
 
 .chart-bounding-box {
   border-width: 1px;
