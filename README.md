@@ -1,6 +1,8 @@
-# Conceptvector
+# EssayIQ
 
-## Setting up the environment
+- Settings are identical to Conceptvector. The followings are copied from Conceptvector.
+
+## Setting up the environment: 
 
 #### 1. Install `Anaconda`
 
