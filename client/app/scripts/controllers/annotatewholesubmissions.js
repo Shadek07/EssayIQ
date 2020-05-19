@@ -9,12 +9,19 @@
  */
 angular.module('conceptvectorApp')
   .controller('annotatewholesubmissionsCtrl', ['$scope', '$http', 'serverURL', '$routeParams', 'AutoComplete', 'recommend', 'AuthService', function($scope, $http, serverURL, $routeParams, AutoComplete, recommend, AuthService) {
-
     $scope.submissionID = $routeParams.submissionID;
-    $scope.assignmentID = $routeParams.assignmentID;
+    $scope.assignmentID = parseInt($routeParams.assignmentID);
     $scope.assignment_list = [];
     $scope.colors = [];
     var index = 0;
+    $scope.userid = AuthService.getUserId();
+    $scope.username = AuthService.getUserName();
+
+    $http.get(serverURL + '/assignments/' + $routeParams.assignmentID, {withCredentials: true, contentType : "application/json"}).success(function(data) {
+        console.log(data);
+        $scope.assignment = data;
+        $scope.assignmentname = $scope.assignment.name;
+      });
     $http.get(serverURL + '/annotatewholesubmissions/' + $routeParams.assignmentID, {withCredentials: true, contentType : "application/json"}).success(function(data) {
         console.log('whole submission data', data);
         $scope.data = data;
@@ -25,10 +32,10 @@ angular.module('conceptvectorApp')
         $scope.themes = data;
       });
 
-      $http.get(serverURL + '/GetAnnotation/'+$routeParams.assignmentID, {withCredentials: true, contentType : "application/json"})
+      $http.get(serverURL + '/GetAnnotation/'+ $scope.userid, {withCredentials: true, contentType : "application/json"})
           // handle success
           .success(function(data) {
-            console.log('get method save annotation', data);
+            console.log('get method annotation', data);
             $scope.annotation = data;
             $scope.fileSuccess = true;
             $scope.fileError = false;
@@ -36,8 +43,8 @@ angular.module('conceptvectorApp')
           })
           // handle error
           .error(function(data) {
-            $scope.fileError = true;
-            $scope.fileSuccess = false;
+              $scope.fileError = true;
+              $scope.fileSuccess = false;
           });
 
     $scope.isOwner = function() {

@@ -34,6 +34,7 @@
                                 <option value="">--Select Assignment--</option>
                                 <option ng-repeat="assignment in assignments" value="{{assignment.assignmentID}}">{{assignment.name}}</option>
                               </select>
+                              <br> <br> <br> <br>
                         </div>
                         <a class="btn btn-default" ng-if="checkIfAssignmentSelected()" ng-href="{{'/#/wholesubmissions/'+ selectedAssignment}}"><i class="fa fa-plus"></i>
                                 Analyze whole submissions

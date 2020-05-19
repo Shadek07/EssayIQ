@@ -16,4 +16,4 @@ bcrypt = Bcrypt(app)
 app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT'
 
 cors = CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
-distance_threshold = 0.70
+distance_threshold = 0.60

@@ -5,11 +5,12 @@ from sklearn.preprocessing import normalize
 from sqlalchemy.exc import SQLAlchemyError
 from marshmallow import ValidationError
 from models import User, Concepts, ConceptsSchema, Article, ArticleSchema, CommentSchema
+from models import Annotation, AnnotationSchema
 from models import Assignment, AssignmentSchema, Theme, ThemeSchema, ThemeAssignmentJoinSchema, SubmissionAssignmentJoinSchema, ThemeSentence, ThemeSentenceSchema, Submission, SubmissionSchema
-from ml import embedding
-from ml import kde
-from ml import kde_new
-from ml import matching
+#from ml import embedding
+#from ml import kde
+#from ml import kde_new
+#from ml import matching
 from flask import request, jsonify, session, Response
 import ipdb
 import re
@@ -21,6 +22,8 @@ import json
 import ast
 import os
 import pandas as pd
+import random
+from nltk.stem import WordNetLemmatizer
 
 from scipy.spatial import distance
 #from spacy.lang.en.stop_words import STOP_WORDS
@@ -30,12 +33,55 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import sent_tokenize, word_tokenize
 
 
+lemmatizer = WordNetLemmatizer()
+STOP_WORDS = ["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself",
+                  "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself",
+                  "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that",
+                  "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+                  "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as",
+                  "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through",
+                  "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off",
+                  "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how",
+                  "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not",
+                  "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should",
+                  "now"]
 module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
 #@param ["https://tfhub.dev/google/universal-sentence-encoder/4","https://tfhub.dev/google/universal-sentence-encoder-large/5"]
 model = hub.load(module_url)
 print ("module %s loaded" % module_url)
+
+
+header_read = False
+
+skip_head = True
+# dist_type = 'cosine' #'euclidean'
+vocabulary = []
+dictionary = {}
+embeddings = None
+cache_capacity = 10000
+
+with open('./PhraseModel/wiki_4gram_50d.txt', 'r') as filehandler:
+  numbers = []
+  cnt = 0
+  for line in filehandler:
+    if skip_head and not header_read:
+      header_read = True
+      pass
+    else:
+      split = line.split(' ')
+      dictionary[split[0]] = len(vocabulary)
+      vocabulary.append(True) #dummy value
+      numbers.append([float(x) for x in split[1:]])  # split[1:]
+    cnt += 1
+
+embeddings = np.array(numbers, dtype=np.float32)
+print 'embedding done'
+
 def embed(input):
   return model(input)
+def deleteUSE_model():
+  global model
+  del model
 
 schema = ConceptsSchema()
 assignment_schema = AssignmentSchema()
@@ -53,324 +99,57 @@ headerNames = ['word'] + range(300)
 wordsFileName = './data/wiki_4gram_50d.txt'
 
 # unified w2v queries with caching
-w2v_model = embedding.EmbeddingModel(wordsFileName)
+'''w2v_model = embedding.EmbeddingModel(wordsFileName)
 kde_model = kde.KdeModel(w2v_model)
-kde_model = kde_new.KdeModel(w2v_model)
+kde_model = kde_new.KdeModel(w2v_model)'''
 default_kde_h_sq = 2
 # default_kde_h_sq = 1e-1
 
 # previous_clustering_result = None
 
 print 'I am ready......'
-
+serverAnnotator = 7
 white = ['http://localhost:5000', 'http://localhost:9000']
 @app.after_request
 def after_request(response):
-  '''response.headers.add('Access-Control-Allow-Credentials', "true")
-  response.headers.add('Access-Control-Allow-Origin', 'http://localhost:9000')
+  #print request.environ
+  ''' response.headers.add('Access-Control-Allow-Credentials', "true")
+  response.headers.add('Access-Control-Allow-Origin', 'http://0.0.0.0:9000')
+  response.headers.add('Access-Control-Allow-Origin', 'http://0.0.0.0:5000')
+  response.headers.add('Access-Control-Allow-Origin', 'http://www.hdilab-essayiq.xyz:5000')
+  response.headers.add('Access-Control-Allow-Origin', 'http://hdilab-essayiq.xyz:5000')
+  response.headers.add('Access-Control-Allow-Origin', 'http://www.hdilab-essayiq.xyz:9000')
   response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
   response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
   response.headers.add('Access-Control-Allow-Headers', 'Cache-Control')
   response.headers.add('Access-Control-Allow-Headers', 'X-Requested-With')
   response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-  return response'''
-
-  white_origin = ['http://localhost:9000', 'http://localhost', 'http://localhost:5000']
-  if request.headers['Origin'] in white_origin:
+  return response
+  print 'request header', request.headers['Origin']
+  white_origin = ['http://0.0.0.0:9000', 'http://0.0.0.0:5000']'''
+  server = True
+  if server: #for server
     response.headers['Access-Control-Allow-Credentials'] = "true"
-    response.headers['Access-Control-Allow-Origin'] = request.headers['Origin']
+    response.headers['Access-Control-Allow-Origin'] =  'http://www.hdilab-essayiq.xyz:9000' #'http://127.0.0.1:9000'#
     response.headers['Access-Control-Allow-Methods'] = 'PUT,GET,POST,DELETE,OPTIONS,PATCH'
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
     response.headers.add('Access-Control-Allow-Headers', 'Cache-Control')
     response.headers.add('Access-Control-Allow-Headers', 'X-Requested-With')
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-  return response
-
-class RecommendWordsClusterKDE(Resource):
-
-  def post(self):
-    try:
-      # import ipdb; ipdb.set_trace()
-      print 'I am here'
-
-      parser = reqparse.RequestParser()
-      parser.add_argument('positiveWords', type=unicode, action='append', required=True, help="Positive words cannot be blank!")
-      parser.add_argument('negativeWords', type=unicode, action='append', help='Negative words')
-      parser.add_argument('irrelevantWords', type=unicode, action='append', help='Irrelevant Words')
-      parser.add_argument('positiveCluster', type=unicode, action='append', help='Current Positive Clusters')
-      parser.add_argument('negativeCluster', type=unicode, action='append', help='Current Negative Clusters')
-
-
-      args = parser.parse_args()
-
-      # ipdb.set_trace()
-
-      positive_terms = args['positiveWords']
-      negative_terms = args['negativeWords']
-      irrelevant_terms = args['irrelevantWords']
-      positiveCluster = args['positiveCluster']
-      negativeCluster = args['negativeCluster']
-
-
-
-      if positive_terms == None:
-        positive_terms = []
-      else:
-        positive_terms = [w.encode('UTF-8') for w in positive_terms]
-
-      if negative_terms == None:
-        negative_terms = []
-      else:
-        negative_terms = [w.encode('UTF-8') for w in negative_terms]
-
-      if irrelevant_terms == None:
-        irrelevant_terms = []
-      else:
-        irrelevant_terms = [w.encode('UTF-8') for w in irrelevant_terms]
-
-      if positiveCluster == None:
-        positiveCluster = []
-      else:
-        positiveCluster = [ eval( w.encode('UTF-8')) for w in positiveCluster]
-        positiveCluster = [[w.encode('UTF-8') for w in x] for x in positiveCluster ]
-        positiveCluster = {i:w for i,w in enumerate(positiveCluster)}
-
-      if negativeCluster == None:
-        negativeCluster = []
-      else:
-        negativeCluster = [ eval( w.encode('UTF-8')) for w in negativeCluster]
-        negativeCluster = [[w.encode('UTF-8') for w in x] for x in negativeCluster ]
-        negativeCluster = {i:w for i,w in enumerate(negativeCluster)}
-
-
-      # Because pairwise distance computations are cached in the w2v_model,
-      # we do not need to worry about re-training the kde model
-      #
-      # Note: You can later put irr_words (see the function)
-      kde_model.learn(h_sq=default_kde_h_sq,
-                      pos_words=positive_terms,
-                      neg_words=negative_terms,
-                      irr_words=irrelevant_terms)
-
-      positive_recommend = kde_model.recommend_pos_words(how_many=50)
-      negative_recommend = kde_model.recommend_neg_words(how_many=50)
-
-      # get embeddings and cluster words
-      kmeans = cluster.KMeans(n_clusters=5)
-      positive_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                  for x in positive_recommend]
-      positive_clusters = kmeans.fit_predict(positive_reco_embeddings)
-      kmeans = cluster.KMeans(n_clusters=5)  # should start from scratch
-      negative_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                  for x in negative_recommend]
-      negative_clusters = kmeans.fit_predict(negative_reco_embeddings)
-
-      # Compares to the previous clustering result and try to match the number
-      current_clustering_result = collections.defaultdict(list)
-      for index, word in enumerate(positive_recommend):
-        current_clustering_result[positive_clusters[index]].append(word)
-
-      print positiveCluster
-      # import ipdb; ipdb.set_trace()
-      print current_clustering_result
-
-
-      mapping = matching.solve_matching(5, \
-          positiveCluster, current_clustering_result)
-      print mapping
-      # positive_clusters = [mapping[x] for x in positive_clusters]
-      current_clustering_remapped = {}
-      for k, v in current_clustering_result.iteritems():
-        current_clustering_remapped[mapping[k]] = v
-      current_clustering_result = current_clustering_remapped
-
-      print current_clustering_result
-      # import ipdb; ipdb.set_trace()
-
-      positive_recommend = []
-      positive_clusters = []
-      for key,value in current_clustering_result.iteritems():
-        for w in value:
-          positive_recommend.append(w)
-          positive_clusters.append(key)
-
-      print positive_recommend
-      print positive_clusters
-      print "hihi"
-
-      # Compares to the previous clustering result and try to match the number
-      current_clustering_result = collections.defaultdict(list)
-      for index, word in enumerate(negative_recommend):
-        current_clustering_result[negative_clusters[index]].append(word)
-
-      mapping = matching.solve_matching(5, \
-          negativeCluster, current_clustering_result)
-      # negative_clusters = [mapping[x] for x in negative_clusters]
-      current_clustering_remapped = {}
-      for k, v in current_clustering_result.iteritems():
-        current_clustering_remapped[mapping[k]] = v
-      current_clustering_result = current_clustering_remapped
-
-      negative_recommend = []
-      negative_clusters = []
-      for key,value in current_clustering_result.iteritems():
-        for w in value:
-          negative_recommend.append(w)
-          negative_clusters.append(key)
-
-      positive_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                        for x in positive_recommend]
-      positive_term_embeddings = [w2v_model.get_embedding_for_a_word(x).tolist()
-                                  for x in positive_terms]
-
-      positive_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                              for x in negative_recommend]
-      negative_term_embeddings = [w2v_model.get_embedding_for_a_word(x).tolist()
-                                  for x in negative_terms]
-
-      return jsonify(positiveRecommend=positive_recommend,
-                     positiveCluster=positive_clusters,
-               positiveVectors=[x.tolist() for x in positive_reco_embeddings],
-               positiveSearchTermVectors=positive_term_embeddings,
-               negativeRecommend=negative_recommend,
-               negativeCluster=negative_clusters,
-               negativeVectors=[x.tolist() for x in negative_reco_embeddings],
-               negativeSearchTermVectors=negative_term_embeddings
-               )
-
-    except Exception as e:
-      # ipdb.set_trace()
-      return {'error': str(e)}
-
-class RecommendWordsClusterMinMax(Resource):
-
-  def post(self):
-    try:
-
-      parser = reqparse.RequestParser()
-      parser.add_argument('positiveWords', type=unicode, action='append', required=True, help="Positive words cannot be blank!")
-      parser.add_argument('negativeWords', type=unicode, action='append', help='Negative words')
-
-      args = parser.parse_args()
-
-      positive_terms = args['positiveWords']
-      negative_terms = args['negativeWords']
-
-      if positive_terms == None:
-        positive_terms = []
-      else:
-        positive_terms = [w.encode('UTF-8') for w in positive_terms]
-
-      if negative_terms == None:
-        negative_terms = []
-      else:
-        negative_terms = [w.encode('UTF-8') for w in negative_terms]
-
-
-      # Because pairwise distance computations are cached in the w2v_model,
-      # we do not need to worry about re-training the kde model
-      #
-      # Note: You can later put irr_words (see the function)
-      kde_model.learn(h_sq=default_kde_h_sq,
-                      pos_words=positive_terms,
-                      neg_words=negative_terms,
-                      irr_words=[])
-      # Jurim : instead of kde model, we use inner product for recommendation
-
-      positive_recommend = kde_model.recommend_pos_words(how_many=50)
-      negative_recommend = kde_model.recommend_neg_words(how_many=50)
-
-      # get embeddings and cluster words
-      kmeans = cluster.KMeans(n_clusters=5)
-      positive_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                  for x in positive_recommend]
-      positive_clusters = kmeans.fit_predict(positive_reco_embeddings)
-      kmeans = cluster.KMeans(n_clusters=5)  # should start from scratch
-      negative_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                  for x in negative_recommend]
-      negative_clusters = kmeans.fit_predict(negative_reco_embeddings)
-
-      positive_term_embeddings = [w2v_model.get_embedding_for_a_word(x).tolist()
-                                  for x in positive_terms]
-      negative_term_embeddings = [w2v_model.get_embedding_for_a_word(x).tolist()
-                                  for x in negative_terms]
-
-      return jsonify(positiveRecommend=positive_recommend,
-                     positiveCluster=positive_clusters.tolist(),
-               positiveVectors=[x.tolist() for x in positive_reco_embeddings],
-               positiveSearchTermVectors=positive_term_embeddings,
-               negativeRecommend=negative_recommend,
-               negativeCluster=negative_clusters.tolist(),
-               negativeVectors=[x.tolist() for x in negative_reco_embeddings],
-               negativeSearchTermVectors=negative_term_embeddings)
-
-    except Exception as e:
-      return {'error': str(e)}
-
-
-class RecommendWordsClusterDot(Resource):
-
-  def post(self):
-    try:
-
-      parser = reqparse.RequestParser()
-      parser.add_argument('positiveWords', type=unicode, action='append', required=True, help="Positive words cannot be blank!")
-      parser.add_argument('negativeWords', type=unicode, action='append', help='Negative words')
-
-      args = parser.parse_args()
-
-      positive_terms = args['positiveWords']
-      negative_terms = args['negativeWords']
-
-      if positive_terms == None:
-        positive_terms = []
-      else:
-        positive_terms = [w.encode('UTF-8') for w in positive_terms]
-
-      if negative_terms == None:
-        negative_terms = []
-      else:
-        negative_terms = [w.encode('UTF-8') for w in negative_terms]
-
-
-      # Because pairwise distance computations are cached in the w2v_model,
-      # we do not need to worry about re-training the kde model
-      #
-      # Note: You can later put irr_words (see the function)
-      dot_model.learn(pos_words=positive_terms,
-                      neg_words=negative_terms, irr_words=[])
-
-      positive_recommend = dot_model.recommend_pos_words(how_many=50)
-      negative_recommend = dot_model.recommend_neg_words(how_many=50)
-
-      # get embeddings and cluster words
-      kmeans = cluster.KMeans(n_clusters=5)
-      positive_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                  for x in positive_recommend]
-      positive_clusters = kmeans.fit_predict(positive_reco_embeddings)
-      kmeans = cluster.KMeans(n_clusters=5)  # should start from scratch
-      negative_reco_embeddings = [w2v_model.get_embedding_for_a_word(x)
-                                  for x in negative_recommend]
-      negative_clusters = kmeans.fit_predict(negative_reco_embeddings)
-
-      positive_term_embeddings = [w2v_model.get_embedding_for_a_word(x).tolist()
-                                  for x in positive_terms]
-      negative_term_embeddings = [w2v_model.get_embedding_for_a_word(x).tolist()
-                                  for x in negative_terms]
-
-      return jsonify(positiveRecommend=positive_recommend,
-                     positiveCluster=positive_clusters.tolist(),
-               positiveVectors=[x.tolist() for x in positive_reco_embeddings],
-               positiveSearchTermVectors=positive_term_embeddings,
-               negativeRecommend=negative_recommend,
-               negativeCluster=negative_clusters.tolist(),
-               negativeVectors=[x.tolist() for x in negative_reco_embeddings],
-               negativeSearchTermVectors=negative_term_embeddings)
-
-    except Exception as e:
-      return {'error': str(e)}
-
+    return response
+  else:
+    white_origin = ['http://0.0.0.0:9000', 'http://0.0.0.0:5000']
+    if request.headers['Origin'] in white_origin: #for local
+      response.headers['Access-Control-Allow-Credentials'] = "true"
+      response.headers['Access-Control-Allow-Origin'] = request.headers['Origin']
+      response.headers['Access-Control-Allow-Methods'] = 'PUT,GET,POST,DELETE,OPTIONS,PATCH'
+      response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
+      response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+      response.headers.add('Access-Control-Allow-Headers', 'Cache-Control')
+      response.headers.add('Access-Control-Allow-Headers', 'X-Requested-With')
+      response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    return response
 
 class QueryAutoComplete(Resource):
   def get(self, word):
@@ -540,7 +319,7 @@ class SubmissionList(Resource):
 class ThemeList(Resource):
   def get(self):
     theme_query = Theme.query.join(Assignment, Assignment.id==Theme.assignment_id)\
-                  .add_columns(Theme.id, Theme.assignment_id, Theme.themeName, Theme.color, Theme.themeSentences, Assignment.name, Assignment.title)
+                  .add_columns(Theme.id, Theme.assignment_id, Theme.themeName, Theme.color, Theme.themeSentences, Assignment.name, Assignment.title).order_by(Theme.id)
     results = themeAssignmentJoinSchema.dump(theme_query, many=True).data #theme_schema.dump(theme_query, many=True).data
     print 'get method of theme'
     return results
@@ -565,8 +344,8 @@ class ThemeData(Resource):
                    Assignment.title)
     results = themeAssignmentJoinSchema.dump(theme_query,
                                              many=True).data  # theme_schema.dump(theme_query, many=True).data
-    print 'specific theme'
-    print results
+    #print 'specific theme'
+    #print results
     return results[0]
   def patch(self, themeId):
     theme = Theme.query.get_or_404(themeId)
@@ -592,7 +371,6 @@ class ThemeByAssignment(Resource):
 class ConceptList(Resource):
   def get(self):
     concepts_query = Concepts.query.all()
-    print "abc"
     print concepts_query
     results = schema.dump(concepts_query, many=True).data
     return results
@@ -774,7 +552,6 @@ class ConceptDownload(Resource):
 
 class ConceptDelete(Resource):
   def get(self,id):
-
     concept = Concepts.query.get_or_404(id)
     try:
       if session.get('logged_in'):
@@ -830,46 +607,14 @@ class AssignmentDelete(Resource):
       return resp
 
 class SubmissionHighlight(Resource):
-  #for each submission sentence, this function returns themeName or No theme
   def get(self, submission_id, assignment_id):
     return WholeSubmissionHighlight().getData(submission_id, assignment_id)
-    '''themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
-    themes = ThemeSchema().dump(themeQuery, many=True).data
-    submission = Submission.query.get_or_404(submission_id)
-    essay = submission.submissionBody
-    print 'themes', themes[0]
-    x = [(theme['themeName'], theme['themeSentences'], theme['color']) for theme in themes]
-    submission_sentences = self.get_sentence_array(essay)
-    theme_sentences_array = [self.get_sentence_array(item[1]) for item in x]
-    num_themes = len(theme_sentences_array)
-    theme_embedding = []
-    for i in range(0, len(theme_sentences_array)):
-      theme_embedding.append(embed(theme_sentences_array[i]))
-    themeMarker = []
-    themeColors = []
-    for sent in submission_sentences:
-      candidate_embedding = embed([sent])
-      most_similar_sentences = []
-      for i in range(0, len(theme_embedding)): #for each theme
-        sent_embeddings = np.array(theme_embedding[i])
-        dists = distance.cdist(candidate_embedding[:1], sent_embeddings, 'cosine')[0, :]
-        tuples = [tup for tup in sorted(enumerate(dists), key=lambda x: x[1])]
-        for j in range(0, len(tuples)):
-          most_similar_sentences.append((tuples[j][1], x[i][0], x[i][2], theme_sentences_array[i][tuples[j][0]])) #x[i][0] is themeName
-      most_similar_sentences = sorted(most_similar_sentences, key=lambda x: x[0])
-      if most_similar_sentences[0][0] <= distance_threshold:
-        themeMarker.append(most_similar_sentences[0][1])
-        themeColors.append(most_similar_sentences[0][2])
-      else:
-        themeMarker.append("No theme")
-        themeColors.append("None")
-    colors = ['#ffff00', '	#7CFC00', '#00FFFF', '	#FF69B4', '#A9A9A9']
-
-    return {'sentences': submission_sentences, 'themes': themeMarker, 'colors': themeColors, 'submissionName': submission.submissionName}
-    '''
   def get_sentence_array(self, essaystr):
-    essaystr = essaystr.replace("\r","")
-    essaystr = essaystr.replace("\n","")
+    essaystr = essaystr.replace("\r", " ")
+    essaystr = essaystr.replace("\n", " ")
+    essaystr = ' '.join(essaystr.split())
+    if essaystr.find('?') != -1:
+      print 'essaystr', essaystr
     sentences = sent_tokenize(essaystr)
     ngrams = []
     for sentence in sentences:
@@ -885,7 +630,6 @@ class AnnotateWholeSubmissions(Resource):
       results.append(self.getData(submission['submissionID'], assignment_id))
     return results
 
-  # for each submission sentence, this function returns themeName or No theme
   def getData(self, submission_id, assignment_id):
     themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
     themes = ThemeSchema().dump(themeQuery, many=True).data
@@ -893,12 +637,13 @@ class AnnotateWholeSubmissions(Resource):
     essay = submission.submissionBody
     x = [(theme['themeName'], theme['themeSentences'], theme['color']) for theme in themes]
     submission_sentences = self.get_sentence_array(essay)
-    print 'submission name', submission.submissionName
-    return {'sentences': submission_sentences, 'submissionname': submission.submissionName, 'themes': themes}
+    #print 'submission name', submission.submissionName
+    return {'sentences': submission_sentences, 'submissionid': submission_id, 'submissionname': submission.submissionName, 'themes': themes}
 
   def get_sentence_array(self, essaystr):
-    essaystr = essaystr.replace("\r", "")
-    essaystr = essaystr.replace("\n", "")
+    essaystr = essaystr.replace("\r", " ")
+    essaystr = essaystr.replace("\n", " ")
+    essaystr = ' '.join(essaystr.split())
     sentences = sent_tokenize(essaystr)
     ngrams = []
     for sentence in sentences:
@@ -908,53 +653,208 @@ class AnnotateWholeSubmissions(Resource):
 class SaveAnnotation(Resource):
   def post(self):
     parser = reqparse.RequestParser()
-    parser.add_argument('submissionname', type=str, help="submission name")
-    parser.add_argument('sentenceindex', type=int, help='Sentence index')
-    parser.add_argument('selectedtheme', type=int, help='Selected theme')
-    parser.add_argument('assignmentid', type=int, help='Assignment id')
+    parser.add_argument('assignment_id', type=int, help='Assignment id')
+    parser.add_argument('submissionID', type=int, help='submission id')
+    parser.add_argument('sentenceIndex', type=int, help='Sentence index')
+    parser.add_argument('selectedTheme', type=int, help='Selected theme')
+    parser.add_argument('annotatorID', type=int, help='user id')
+    parser.add_argument('submissionName', type=str, help="submission name")
+    parser.add_argument('sentence', type=unicode, help="sentence content")
+    parser.add_argument('annotatorName', type=str, help='user name')
     # parser.add_argument('creator_id', type=int, help='Password to create user')
     args = parser.parse_args()
-    print args
-    f = open("annotation.txt", "a+")
+    #assignment_id, submissionID, sentenceIndex, selectedTheme, annotatorID, submissionName=None, annotatorName=None
+    AnnotationObject = Annotation(args['assignment_id'], args['submissionID'], args['sentenceIndex'], args['selectedTheme'], args['annotatorID'], args['sentence'], args['submissionName'], args['annotatorName'])
+    AnnotationObject.add(AnnotationObject)
+    query = Annotation.query.get(AnnotationObject.id)
+    results = AnnotationSchema().dump(query).data
+    return results
+    '''f = open("annotation.txt", "a+")
     f.write(str(args)+'\n')
-    return 201
-
-
-
-
+    return 201'''
 
 class GetAnnotation(Resource):
-  def get(self, assignment_id):
+  def getthemesentence(self, themeid):
+    annotationQuery = Annotation.query.filter_by(selectedTheme=themeid)
+    annotations = AnnotationSchema().dump(annotationQuery, many=True).data
+    random.shuffle(annotations) #randomize annotation data
+    themesentences = ""
+    numsentences =  int(len(annotations)*0.10) #take 10% of annotated theme sentences from all annotator
+    if numsentences < 10:
+      numsentences = min(10, len(annotations))
+    print 'numsentences', numsentences
+    for x in annotations[0:numsentences]:
+      themesentences = themesentences + ' ' + x['sentence']
+    return themesentences
+  def getgoldstandard(self, submissionid, userid):
+    annotationQuery = Annotation.query.filter_by(submissionID=submissionid, annotatorID=userid).order_by('sentenceIndex')
+    annotations = AnnotationSchema().dump(annotationQuery, many=True).data
+    return annotations
+  def getthemesentencebyuser(self, themeid, userid):
+    #print themeid, userid
+    annotationQuery = Annotation.query.filter_by(selectedTheme=themeid, annotatorID=userid)
+    annotations = AnnotationSchema().dump(annotationQuery, many=True).data
+    print 'annotation size', len(annotations)
+    random.shuffle(annotations)
+    themesentences = ""
+    numsentences = int(len(annotations) * 0.10)  # take 10% of annotated theme sentences from all annotator
+    if numsentences < 10:
+      numsentences = min(10, len(annotations))
+    print themeid, numsentences
+    for x in annotations[0:numsentences]:
+      themesentences = themesentences + ' ' + x['sentence']
+    return themesentences
+
+  def get(self, annotatorID):
+    annotationQuery = Annotation.query.filter_by(annotatorID=annotatorID)
+    annotations = AnnotationSchema().dump(annotationQuery, many=True).data
+    return annotations
+  '''def get(self, assignment_id):
     annotation = {}
     annotation['sentence'] = []
     with open('annotation.txt') as fp:
       for line in fp:
-        #obj = json.dumps(line, ensure_ascii=False)
+        if len(line) < 10:
+          continue
         print type(line)
         #data = json.loads(line)
         data = ast.literal_eval(line)
         if int(data['assignmentid']) == int(assignment_id):
           annotation['sentence'].append(data)
-    return annotation['sentence']
+    return annotation['sentence']'''
+class GetUserAnnotation(Resource):
+  def get(self, userid, selectedtheme):
+    '''parser = reqparse.RequestParser()
+    parser.add_argument('userid', type=int, help="user id")
+    parser.add_argument('selectedtheme', type=int, help='theme id')
+    args = parser.parse_args()
+    print args['userid']'''
+    print selectedtheme, userid
+    userid = int(userid)
+    selectedtheme = int(selectedtheme)
+    return GetAnnotation().getthemesentencebyuser(selectedtheme, userid) #args['selectedtheme'], args['userid']
+    #return 201
+
+
+class DeleteAnnotation(Resource):
+  def get(self, id):
+    annotation = Annotation.query.get_or_404(id)
+    try:
+      if session.get('logged_in'):
+        userID = session['user']
+      if userID == annotation.annotatorID:
+        delete = annotation.delete(annotation)
+        return {'annotation': GetAnnotation().get(annotation.annotatorID), 'id': id}
+      else:
+        resp = jsonify({"error": "You are not owner of this concept"})
+        resp.status_code = 401
+        return resp
+    except Exception as e:
+      print e
+      return {'error':str(e)}
+
+# simple Least Recently Used Cache
+# inspired by https://www.kunxi.org/blog/2014/05/lru-cache-in-python/
+class LRUCache:
+  def __init__(self, capacity):
+    self._cache = collections.OrderedDict()
+    self._capacity = capacity
+
+  def __setitem__(self, key, value):
+    if key in self._cache:
+      self._cache.pop(key)
+    elif len(self._cache) >= self._capacity:
+      self._cache.popitem(last=False)
+    self._cache[key] = value
+
+  def __getitem__(self, key):
+    if key in self._cache:
+      value = self._cache.pop(key)
+      # put in the back
+      self._cache[key] = value
+      return value
+    else:
+      return None
+
+  def __contains__(self, key):
+    return key in self._cache
 
 class WholeSubmissionHighlight(Resource):
-  def get(self, assignment_id):
+  def get(self, assignment_id, userid):
     submissionQuery = Submission.query.filter_by(assignmentID=assignment_id)
     submissions = SubmissionSchema().dump(submissionQuery, many=True).data
     results = []
+    if serverAnnotator != None:
+      userid = serverAnnotator
+    phrase2vecresult = []
+    f2 = open('essayiqgold.txt', "w")
+    sentence_cnt = [0]
     for submission in submissions:
-      results.append(self.getData(submission['submissionID'], assignment_id))
+      results.append(self.getData(submission['submissionID'], assignment_id, userid, sentence_cnt))
+      phrase2vecresult.append(self.getDataPhrase2Vec(submission['submissionID'], assignment_id, userid))
+      goldstandardannotations = GetAnnotation().getgoldstandard(submission['submissionID'], userid)
+      for annotation in goldstandardannotations:
+        dic = dict()
+        dic['sentence'] = annotation['sentence']
+        dic['themeid'] = annotation['selectedTheme']
+        theme = Theme.query.get_or_404(annotation['selectedTheme'])
+        dic['color'] = theme.color
+        dic['sentenceindex'] = annotation['sentenceIndex']
+        dic['submissionname'] = submission['submissionName']
+        f2.write(json.dumps(dic)+'\n')
+    f2.close()
+    print 'sentence count', sentence_cnt[0]
+    #deleteUSE_model()
+
+
+    f = open("essayiq.txt", "w")
+    for res in results:
+      for i in range(len(res['sentences'])):
+        dic = dict()
+        dic['sentence'] = res['sentences'][i]
+        dic['themeMarker'] = res['themeMarkers'][i]
+        dic['color'] = res['colors'][i]
+        dic['submissionname'] = res['submissionName']
+        dic['themeid'] = res['themeids'][i]
+        dic['sentenceindex'] = i
+        f.write(json.dumps(dic)+'\n')
+
+    # for submission in submissions:
+    # phrase2vecresult.append(self.getDataPhrase2Vec(submission['submissionID'], assignment_id, userid))
+    f3 = open('phrase2vec.txt', "w")
+    for res in phrase2vecresult:
+      for i in range(len(res['sentences'])):
+        dic = dict()
+        dic['sentence'] = res['sentences'][i]
+        dic['themeMarker'] = res['themeMarkers'][i]
+        dic['color'] = res['colors'][i]
+        dic['submissionname'] = res['submissionName']
+        dic['themeid'] = res['themeids'][i]
+        dic['sentenceindex'] = i
+        f3.write(json.dumps(dic)+'\n')
+
     return results
 
+  def clean_sentence(self, sentence):
+      sentence = sentence.lower().strip()
+      sentence = re.sub(r'[^a-z0-9_\s]', '', sentence)
+      return re.sub(r'\s{2,}', ' ', sentence)
+
+  def tokenize(self,sentence):
+    return [lemmatizer.lemmatize(token) for token in sentence.split() if ((token not in STOP_WORDS)
+                                                                          and (not token.isdigit()))]
   # for each submission sentence, this function returns themeName or No theme
-  def getData(self, submission_id, assignment_id):
+  def getData(self, submission_id, assignment_id, userid, sentence_cnt=None):
     themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
     themes = ThemeSchema().dump(themeQuery, many=True).data
     submission = Submission.query.get_or_404(submission_id)
     essay = submission.submissionBody
-    print 'themes', themes[0]
-    x = [(theme['themeName'], theme['themeSentences'], theme['color'], theme['id']) for theme in themes]
+
+    #x = [(theme['themeName'], theme['themeSentences'], theme['color'], theme['id']) for theme in themes]
+    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid), theme['color'], theme['id']) for theme in themes]
     submission_sentences = self.get_sentence_array(essay)
+    if sentence_cnt is not None:
+      sentence_cnt[0] += len(submission_sentences)
     theme_sentences_array = [self.get_sentence_array(item[1]) for item in x]
     num_themes = len(theme_sentences_array)
     theme_embedding = []
@@ -982,13 +882,69 @@ class WholeSubmissionHighlight(Resource):
         themeMarker.append("No theme")
         themeColors.append("None")
         selectedThemeSentences.append(("No theme sentence", -1))
-    colors = ['#ffff00', '	#7CFC00', '#00FFFF', '	#FF69B4', '#A9A9A9']
     return {'sentences': submission_sentences, 'themeMarkers': themeMarker, 'colors': themeColors, 'themes': themes,
             'submissionName': submission.submissionName, 'themeSentences': [t[0] for t in selectedThemeSentences], 'themeids': [t[1] for t in selectedThemeSentences]}
 
+  # for each submission sentence, this function returns themeName or No theme
+  def getDataPhrase2Vec(self, submission_id, assignment_id, userid):
+
+    #_cache = LRUCache(cache_capacity)
+
+    def get_embedding_for_words(words):
+      indicies = [dictionary[word] for word in words if word in dictionary]
+      if len(indicies) > 0:
+        embedding = np.mean(embeddings[indicies, :], axis=0)
+      else:
+        embedding = np.zeros(embeddings.shape[1], )
+      return embedding
+
+    themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
+    themes = ThemeSchema().dump(themeQuery, many=True).data
+    submission = Submission.query.get_or_404(submission_id)
+    essay = submission.submissionBody
+
+    # x = [(theme['themeName'], theme['themeSentences'], theme['color'], theme['id']) for theme in themes]
+    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid), theme['color'], theme['id'])
+         for theme in themes]
+    submission_sentences = self.get_sentence_array(essay)
+    theme_sentences_array = [self.get_sentence_array(item[1]) for item in x]
+    num_themes = len(theme_sentences_array)
+    theme_embedding = []
+    for i in range(0, len(theme_sentences_array)):
+      phrasevector = []
+      for theme_sentence in theme_sentences_array[i]:
+        tokenized_sentence = self.tokenize(theme_sentence)
+        phrasevector.append(get_embedding_for_words(tokenized_sentence))
+      theme_embedding.append(phrasevector)
+    themeMarker = []
+    themeColors = []
+    selectedThemeSentences = []
+    for sent in submission_sentences:
+      candidate_embedding = get_embedding_for_words(self.tokenize(sent)) #embed([sent])
+      most_similar_sentences = []
+      for i in range(0, len(theme_embedding)):  # for each theme
+        sent_embeddings = np.array(theme_embedding[i])
+        dists = distance.cdist([candidate_embedding], sent_embeddings, 'cosine')[0, :]
+        tuples = [tup for tup in sorted(enumerate(dists), key=lambda x: x[1])]
+        for j in range(0, len(tuples)):
+          most_similar_sentences.append(
+            (tuples[j][1], x[i][0], x[i][2], theme_sentences_array[i][tuples[j][0]], x[i][3]))  # x[i][0] is themeName
+      most_similar_sentences = sorted(most_similar_sentences, key=lambda t: t[0])
+      if most_similar_sentences[0][0] <= distance_threshold: #threshold is less for phrase2vec
+        themeMarker.append(most_similar_sentences[0][1])
+        themeColors.append(most_similar_sentences[0][2])
+        selectedThemeSentences.append((most_similar_sentences[0][3], most_similar_sentences[0][4]))
+      else:
+        themeMarker.append("No theme")
+        themeColors.append("None")
+        selectedThemeSentences.append(("No theme sentence", -1))
+    return {'sentences': submission_sentences, 'themeMarkers': themeMarker, 'colors': themeColors, 'themes': themes,
+            'submissionName': submission.submissionName, 'themeSentences': [t[0] for t in selectedThemeSentences],
+            'themeids': [t[1] for t in selectedThemeSentences]}
   def get_sentence_array(self, essaystr):
-    essaystr = essaystr.replace("\r", "")
-    essaystr = essaystr.replace("\n", "")
+    essaystr = essaystr.replace("\r", " ")
+    essaystr = essaystr.replace("\n", " ")
+    essaystr = ' '.join(essaystr.split())
     sentences = sent_tokenize(essaystr)
     ngrams = []
     for sentence in sentences:
@@ -1026,10 +982,10 @@ class AddEssaySentenceToTheme(Resource):
     return 201
 
 
+
 api.add_resource(Register, '/api/register')
 api.add_resource(Login, '/api/login')
 api.add_resource(Logout, '/api/logout')
-api.add_resource(QueryAutoComplete, '/api/QueryAutoComplete/<string:word>')
 api.add_resource(Status, '/api/status')
 
 api.add_resource(AssignmentList, '/api/assignments')
@@ -1038,7 +994,7 @@ api.add_resource(AssignmentDelete, '/api/assignment_delete/<int:id>')
 
 api.add_resource(SubmissionList, '/api/submissions')
 api.add_resource(SubmissionHighlight, '/api/submissions/<int:submission_id>/<int:assignment_id>')
-api.add_resource(WholeSubmissionHighlight, '/api/wholesubmissions/<int:assignment_id>')
+api.add_resource(WholeSubmissionHighlight, '/api/wholesubmissions/<int:assignment_id>/<int:userid>')
 api.add_resource(AnnotateWholeSubmissions, '/api/annotatewholesubmissions/<int:assignment_id>')
 
 api.add_resource(ThemeList, '/api/themes')
@@ -1046,21 +1002,11 @@ api.add_resource(ThemeData, '/api/themes/<int:themeId>')
 api.add_resource(ThemeDelete, '/api/theme_delete/<int:themeId>')
 api.add_resource(ThemeByAssignment, '/api/themes_filterbyassignment/<int:assignment_id>')
 
+
 api.add_resource(SaveAnnotation, '/api/saveAnnotation')
-api.add_resource(GetAnnotation, '/api/GetAnnotation/<int:assignment_id>')
+api.add_resource(GetAnnotation, '/api/GetAnnotation/<int:annotatorID>')
+api.add_resource(GetUserAnnotation, '/api/GetUserBasedAnnotation/<int:userid>/<int:selectedtheme>')
+api.add_resource(DeleteAnnotation, '/api/DeleteAnnotation/<int:id>')
 
 api.add_resource(DeleteSentenceFromTheme, '/api/deletethemesentence')
 api.add_resource(AddEssaySentenceToTheme, '/api/AddEssaySentence')
-
-
-api.add_resource(ConceptList, '/api/concepts')
-api.add_resource(ConceptsUpdate, '/api/concepts/<int:id>')
-api.add_resource(ArticleList, '/api/articles')
-api.add_resource(ArticleUpdate, '/api/articles/<int:id>')
-api.add_resource(RecommendWordsClusterKDE, '/api/RecommendWordsClusterKDE')
-api.add_resource(RecommendWordsClusterDot, '/api/RecommendWordsClusterDot')
-api.add_resource(RecommendWordsClusterMinMax, '/api/RecommendWordsClusterMinMax')
-api.add_resource(ConceptScore, '/api/ConceptScores')
-api.add_resource(ConceptDownload, '/api/download_concepts/<int:id>')
-api.add_resource(ConceptDelete, '/api/concept_delete/<int:id>')
-

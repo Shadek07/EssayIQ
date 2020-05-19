@@ -29,12 +29,18 @@ angular.module('conceptvectorApp')
     if ($scope.themeId === 'new') {
 
     } else {
+
+      var dict = {'userid': AuthService.getUserId(), 'selectedtheme': parseInt($routeParams.themeId)};
+        console.log(dict);
+        $http.get(serverURL + '/GetUserBasedAnnotation/'+ AuthService.getUserId().toString() +'/'+ $routeParams.themeId, {withCredentials: true, contentType : "application/json"}).success(function(data) {
+            $scope.theme_sentences = data;
+            console.log('user based theme sentence data', data);
+       });
       $http.get(serverURL + '/themes/' + $routeParams.themeId, {withCredentials: true, contentType : "application/json"}).success(function(data) {
         console.log('specific theme data',data);
         $scope.theme_name = data.themeName
         $scope.selectedAssignment = data.assignment_id;
         $scope.selectedColor = data.color;
-        $scope.theme_sentences = data.themeSentences;
       });
     }
 

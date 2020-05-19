@@ -12,7 +12,7 @@ angular.module('conceptvectorApp')
         var controller = ['$scope', '$uibModal', '$http', 'serverURL', function ($scope, $uibModal, $http, serverURL) {
 
           function init() {
-              console.log('controller themes', $scope.themes);
+              //console.log('controller themes', $scope.themes);
           }
           $scope.sentenceDialog =  function(index, sentence){
                   console.log('index value', index, sentence);
@@ -20,6 +20,7 @@ angular.module('conceptvectorApp')
                   var DialogController = ['$scope','$uibModalInstance' ,function ($scope, $uibModalInstance) {
                         console.log('modal themes', $scope.themes);
                         //console.log('selected param', $scope.$resolve.params.name);
+
                         $scope.source = {
                           selectedtheme: '-1',
                           selectedsentence: sentence,
@@ -31,14 +32,60 @@ angular.module('conceptvectorApp')
                         $scope.cancel = function () {
                             $uibModalInstance.dismiss('cancel');
                         };
+                        $scope.showRemove = function(){
+                            //console.log('annotation data', $scope.annotation);
+                            for( var i = 0; i < $scope.annotation.length; i++)
+                                {
+                                    //console.log('annotation index', i, $scope.assignmentid, $scope.submissionid, index);
+                                    if ($scope.annotation[i]['assignment_id'] === $scope.assignmentid && $scope.annotation[i]['submissionID'] === $scope.submissionid && $scope.annotation[i]['sentenceIndex'] === index)
+                                    {
+                                       return true;
+                                    }
+                                 }
+                            return false;
+                        };
+                        $scope.getAnnotationID = function(){
+                            for( var i = 0; i < $scope.annotation.length; i++)
+                                {
+                                    if ($scope.annotation[i]['assignment_id'] === $scope.assignmentid && $scope.annotation[i]['submissionID'] === $scope.submissionid && $scope.annotation[i]['sentenceIndex'] === index)
+                                    {
+                                       return $scope.annotation[i]['id'];
+                                    }
+                                 }
+                            return -1;
+                        };
+                        $scope.remove = function(){
+                            console.log('here I am');
+                            $http.get(serverURL + '/DeleteAnnotation/'+$scope.getAnnotationID(), {withCredentials: true, contentType : "application/json"})
+                                // handle success
+                                .success(function(data) {
+                                  console.log('annotation delete success', data);
+                                  for( var i = 0; i < $scope.annotation.length; i++)
+                                  {
+                                      if ( $scope.annotation[i]['id'] === data['id'])
+                                      {
+                                          $scope.annotation.splice(i, 1); //delete this annotation from scope
+                                      }
+                                   }
+                                   console.log('success',$scope.annotation);
+                                   $uibModalInstance.dismiss('remove');
+                                })
+                                // handle error
+                                .error(function(data) {
+                                  $scope.fileError = true;
+                                  console.log('delete fail');
+                                  $scope.fileSuccess = false;
+                                });
+                        };
                         $scope.save = function () {
                            console.log('selected theme', $scope.source.selectedtheme);
-                           $http.post(serverURL + '/saveAnnotation', {"submissionname": $scope.submissionname, "sentenceindex": index, "selectedtheme": $scope.source.selectedtheme, "assignmentid" : $scope.assignmentid
-                            }, {withCredentials: true, contentType : "application/json"})
+                           $http.post(serverURL + '/saveAnnotation', {"sentence": sentence,"submissionName": $scope.submissionname, "submissionID": $scope.submissionid, "sentenceIndex": index, "selectedTheme": $scope.source.selectedtheme, "assignment_id" : $scope.assignmentid, "annotatorID": $scope.userid,
+                            "annotatorName": $scope.username}, {withCredentials: true, contentType : "application/json"})
                                 // handle success
                                 .success(function(data) {
                                   $scope.fileSuccess = true;
-                                  $scope.annotation.push({'assignmentid': $scope.assignmentid, 'submissionname': $scope.submissionname, 'sentenceindex': index, 'selectedtheme': $scope.source.selectedtheme});
+                                  console.log('annotation saved data', data);
+                                  $scope.annotation.push(data);
                                   $scope.fileError = false;
                                   $uibModalInstance.dismiss('save');
                                 })
@@ -76,26 +123,36 @@ angular.module('conceptvectorApp')
               $scope.sentenceDialog(index, sentence);
           };
           $scope.getClass = function(index){
-              var className = "";
+              var color = "";
               angular.forEach($scope.annotation, function(x, key) {
                   //console.log($scope.assignmentID)
-                 if(parseInt(x['assignmentid']) === parseInt($scope.assignmentid) && parseInt(x['sentenceindex']) === index && x['submissionname'] ===  $scope.submissionname)
+                 if(parseInt(x['assignment_id']) === $scope.assignmentid && parseInt(x['sentenceIndex']) === index && x['submissionID'] ===  $scope.submissionid)
                   {
-                      className = "highlightAnnotation";
+                      //className = "highlightAnnotation";
+                      angular.forEach($scope.themes, function(y,key){
+                          if(y['id'] === x['selectedTheme']){
+                              color = y['color']; //sentence theme color
+                          }
+                      });
                   }
               });
-              return className;
+              return color;
           }
-      }],
 
-      template = '<span ng-class="getClass($index)" ng-click="clickSentence($index, sentence)" ng-repeat="sentence in sentences">{{" "}} {{sentence}}</span>';
+
+      }],
+      //ng-class="getClass($index)"
+      template = '<span  style="background-color:{{getClass($index)}};" ng-click="clickSentence($index, sentence)" ng-repeat="sentence in sentences">{{" "}} {{sentence}}</span>';
         return {
             restrict: 'EA',
             transclude: true,
             scope: {
+                userid: '=',
+                username: '=',
                 sentences: '=',
                 themes: '=',
                 submissionname: '=',
+                submissionid: '=',
                 assignmentid: '=',
                 annotation: '='
             },

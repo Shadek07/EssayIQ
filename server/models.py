@@ -304,7 +304,7 @@ class ThemeSchema(Schema):
 
 class ThemeAssignmentJoinSchema(Schema):
   class Meta:
-    fields = ('id', 'assignment_id', 'themeName', 'themeSentences', 'name', 'title')
+    fields = ('id', 'assignment_id', 'themeName', 'themeSentences', 'name', 'title', 'color')
 
 class SubmissionAssignmentJoinSchema(Schema):
   class Meta:
@@ -348,5 +348,32 @@ class SubmissionSchema(Schema):
 		#self links
 	class Meta:
 		type_ = 'submissions'
-		fields = ('submissionBody','submissionID', 'assignmentID','submissionDate', 'userID', 'userDisplayName')
+		fields = ('submissionName','submissionBody','submissionID', 'assignmentID','submissionDate', 'userID', 'userDisplayName')
 
+class Annotation(db.Model, CRUD):
+  __tablename__ = 'annotations'
+  id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+  assignment_id = db.Column(db.Integer, db.ForeignKey('assignments.id'))
+  submissionName = db.Column(db.String)
+  submissionID = db.Column(db.Integer, db.ForeignKey('submissions.submissionID'))
+  sentenceIndex = db.Column(db.Integer)
+  sentence = db.Column(db.Text)
+  selectedTheme = db.Column(db.Integer, db.ForeignKey('themes.id'))
+  annotatorID = db.Column(db.Integer, db.ForeignKey('users.id'))
+  annotatorName = db.Column(db.String)
+  __table_args__ = (db.UniqueConstraint('assignment_id', 'submissionID', 'sentenceIndex', 'annotatorID' ), )
+
+  def __init__(self, assignment_id, submissionID, sentenceIndex, selectedTheme, annotatorID, sentence, submissionName=None, annotatorName=None):
+    self.assignment_id = assignment_id
+    self.submissionID = submissionID
+    self.sentenceIndex = sentenceIndex
+    self.selectedTheme = selectedTheme
+    self.annotatorID = annotatorID
+    self.sentence = sentence
+    self.annotatorName = annotatorName
+    self.submissionName = submissionName
+
+class AnnotationSchema(Schema):
+  class Meta:
+    type = 'annotations'
+    fields = ('id', 'assignment_id', 'submissionName', 'submissionID', 'sentenceIndex', 'sentence', 'selectedTheme', 'annotatorID', 'annotatorName')

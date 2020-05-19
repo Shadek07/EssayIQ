@@ -19,6 +19,7 @@ angular
     'ui.bootstrap',
     'ngTagsInput',
     'nvd3',
+    'chart.js',
     'angularUtils.directives.dirPagination',
     'ui.select',
     'cgBusy',

@@ -13,10 +13,10 @@
         var controller = ['$scope', '$uibModal', '$http', 'serverURL', function ($scope, $uibModal, $http, serverURL) {
 
           function init() {
-              console.log('controller themes', $scope.themes);
+              //console.log('controller themes', $scope.themes);
           }
           $scope.sentenceDialog =  function(index, sentence, themeid){
-                  console.log('index value', index, sentence);
+                  //console.log('index value', index, sentence);
                   //console.log('submission name', $scope.submissionname);
                   var DialogController = ['$scope','$uibModalInstance' ,function ($scope, $uibModalInstance) {
                         console.log('modal themes', $scope.themes);

@@ -18,17 +18,13 @@ angular.module('conceptvectorApp')
             },
 
             link: function postLink(scope, element, attrs) {
-
                 var criteriaData = [];
 
                 scope.$watch('data', function(newVals, oldVals) {
-
                     if (newVals === undefined) {
                         return;
                     }
-
                     return scope.renderDataChange();
-
                 }, true);
 
                 scope.$watch(function() {
@@ -132,7 +128,7 @@ d3.intuinno.stackedBar = function module() {
             				.domain(_data.map(function(d){return d.name;}));
 
             var tip = d3.tip().attr('class','d3-tip')
-            				.offset([-10, 0]).html(function(d) { 
+            				.offset([-10, 0]).html(function(d) {
 
                                 if (d.help_text) {
                                     return d.help_text;

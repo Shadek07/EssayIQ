@@ -1,12 +1,17 @@
 <div class="container">
+  <uib-alert  class="alert alert-danger" type="success" ng-show="analyzeError"> Not enough annotated data to analyze </uib-alert>
   <div class="row">
     <div class="col-md-12">
       <a href="/#/submissions" ng-href="/#/submissions" class="btn btn-default pull-right"><i class="fa fa-reply"></i> Go Back </a>
       <!-- <a  target="_self" ng-href="{{download_url}}" class="btn btn-default pull-right"><i class="fa fa-download"></i> Download as JSON </a> -->
-
-      <div class="panel panel-default">
+      <div class="panel panel-default" cg-busy="loadingAnalysis">
+          <div>
+            <h1> Theme vs Essay Count </h1>
+            <canvas id="base" class="chart-horizontal-bar"
+            chart-data="datachart" chart-labels="labels"  chart-colors="chartcolors">
+          </canvas>
+          </div>
           <div class="panel-body">
-
               <div ng-repeat="dataitem in data">
                    <h2>Highlighted essay: ({{dataitem.submissionName}})</h2>
                     <essayhighlight callback-function="callback()" submissionname="dataitem.submissionName" sentences="dataitem.sentences" thememarkers="dataitem.themeMarkers" themes="dataitem.themes" colors="dataitem.colors" ts="dataitem.themeSentences" tids="dataitem.themeids"> </essayhighlight>
