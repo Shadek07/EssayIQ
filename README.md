@@ -2,6 +2,8 @@
 
 - Settings are identical to Conceptvector. The followings are copied from Conceptvector.
 
+[Procedure](./deployment.md) to deploy EssayIQ in Digital Ocean.
+
 ## Setting up the environment: 
 
 #### 1. Install `Anaconda`
