@@ -1,7 +1,7 @@
 from appModule import app, db, bcrypt,api, distance_threshold
 from flask_restful import Resource, reqparse
-from sklearn  import  cluster
-from sklearn.preprocessing import normalize
+#from sklearn  import  cluster
+#from sklearn.preprocessing import normalize
 from sqlalchemy.exc import SQLAlchemyError
 from marshmallow import ValidationError
 from models import User, Concepts, ConceptsSchema, Article, ArticleSchema, CommentSchema
@@ -12,6 +12,8 @@ from models import Assignment, AssignmentSchema, Theme, ThemeSchema, ThemeAssign
 #from ml import kde_new
 #from ml import matching
 from flask import request, jsonify, session, Response
+#from spacy.lang.en.stop_words import STOP_WORDS
+from gensim.models.phrases import Phrases, Phraser
 import ipdb
 import re
 import collections
@@ -31,8 +33,8 @@ from scipy.spatial import distance
 #from gensim.models import Word2Vec
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import sent_tokenize, word_tokenize
-
-
+from sklearn.metrics import cohen_kappa_score
+import time
 lemmatizer = WordNetLemmatizer()
 STOP_WORDS = ["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself",
                   "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself",
@@ -45,14 +47,18 @@ STOP_WORDS = ["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you"
                   "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not",
                   "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should",
                   "now"]
-module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
-#@param ["https://tfhub.dev/google/universal-sentence-encoder/4","https://tfhub.dev/google/universal-sentence-encoder-large/5"]
-model = hub.load(module_url)
-print ("module %s loaded" % module_url)
 
+
+phrases_model_4gram = Phraser.load('4_phrases_model.txt')
+print('4_phrases model loaded')
+#phrases_model_trigram = Phraser.load('tri_phrases_model.txt')
+#print('tri phrases model loaded')
+phrase_model_name = '4gram' #'4gram' # 'trigram'
+
+serverAnnotator = 8
+candidate_sentence_size = 15
 
 header_read = False
-
 skip_head = True
 # dist_type = 'cosine' #'euclidean'
 vocabulary = []
@@ -77,8 +83,6 @@ with open('./PhraseModel/wiki_4gram_50d.txt', 'r') as filehandler:
 embeddings = np.array(numbers, dtype=np.float32)
 print 'embedding done'
 
-def embed(input):
-  return model(input)
 def deleteUSE_model():
   global model
   del model
@@ -108,7 +112,7 @@ default_kde_h_sq = 2
 # previous_clustering_result = None
 
 print 'I am ready......'
-serverAnnotator = 7
+
 white = ['http://localhost:5000', 'http://localhost:9000']
 @app.after_request
 def after_request(response):
@@ -679,9 +683,9 @@ class GetAnnotation(Resource):
     annotations = AnnotationSchema().dump(annotationQuery, many=True).data
     random.shuffle(annotations) #randomize annotation data
     themesentences = ""
-    numsentences =  int(len(annotations)*0.10) #take 10% of annotated theme sentences from all annotator
-    if numsentences < 10:
-      numsentences = min(10, len(annotations))
+    numsentences = candidate_sentence_size
+    if len(annotations) < numsentences:
+      numsentences = len(annotations)
     print 'numsentences', numsentences
     for x in annotations[0:numsentences]:
       themesentences = themesentences + ' ' + x['sentence']
@@ -690,19 +694,49 @@ class GetAnnotation(Resource):
     annotationQuery = Annotation.query.filter_by(submissionID=submissionid, annotatorID=userid).order_by('sentenceIndex')
     annotations = AnnotationSchema().dump(annotationQuery, many=True).data
     return annotations
-  def getthemesentencebyuser(self, themeid, userid):
+  def interannotatoragreement(self, coach1, coach2, assignment_id):
+    annotationQuery = Annotation.query.filter_by(assignment_id=assignment_id, annotatorID=coach1)
+    annotationset1 = AnnotationSchema().dump(annotationQuery, many=True).data
+    annotationQuery = Annotation.query.filter_by(assignment_id=assignment_id, annotatorID=coach2)
+    annotationset2 = AnnotationSchema().dump(annotationQuery, many=True).data
+    valueset = []
+
+    for r1 in annotationset1:
+      for r2 in annotationset2:
+        if r1['submissionName'] == r2['submissionName'] and r1['sentenceIndex'] == r2['sentenceIndex']:
+          valueset.append((r1['selectedTheme'], r2['selectedTheme']))
+          break
+    return valueset
+  def interannotatoragreementsentencelevel(self, coach1, coach2, assignment_id):
+    annotationQuery = Annotation.query.filter_by(assignment_id=assignment_id, annotatorID=coach1)
+    annotationset1 = AnnotationSchema().dump(annotationQuery, many=True).data
+    annotationQuery = Annotation.query.filter_by(assignment_id=assignment_id, annotatorID=coach2)
+    annotationset2 = AnnotationSchema().dump(annotationQuery, many=True).data
+    valueset = []
+
+    for r1 in annotationset1:
+      for r2 in annotationset2:
+        if r1['submissionName'] == r2['submissionName'] and r1['sentenceIndex'] == r2['sentenceIndex']:
+          valueset.append((r1['selectedTheme'], r2['selectedTheme'], r1['submissionName'], r1['sentenceIndex']))
+          break
+    return valueset
+
+  def getthemesentencebyuser(self, themeid, userid, candidate_sentences=None, candidate_sentence_size=None):
     #print themeid, userid
     annotationQuery = Annotation.query.filter_by(selectedTheme=themeid, annotatorID=userid)
     annotations = AnnotationSchema().dump(annotationQuery, many=True).data
     print 'annotation size', len(annotations)
     random.shuffle(annotations)
     themesentences = ""
-    numsentences = int(len(annotations) * 0.10)  # take 10% of annotated theme sentences from all annotator
-    if numsentences < 10:
-      numsentences = min(10, len(annotations))
+    #numsentences = int(len(annotations) * 0.10)  # take 10% of annotated theme sentences from all annotator
+    numsentences = candidate_sentence_size
+    if len(annotations) < numsentences:
+      numsentences =  len(annotations)
     print themeid, numsentences
     for x in annotations[0:numsentences]:
       themesentences = themesentences + ' ' + x['sentence']
+      if candidate_sentences != None:
+        candidate_sentences.append((x['submissionName'], x['sentenceIndex']))
     return themesentences
 
   def get(self, annotatorID):
@@ -780,18 +814,45 @@ class LRUCache:
     return key in self._cache
 
 class WholeSubmissionHighlight(Resource):
-  def get(self, assignment_id, userid):
+  def generateresults(self):
+    sentencecnt = [10]
+    thresholds = [0.7]
+    assignments = [3]
+    annotator = [7]
+    for a in assignments:
+      for coach in annotator:
+          for scnt in sentencecnt:
+            for th in thresholds:
+              for run in range(0, 5):
+                filestr = '_coach_'+ str(coach)+'sentsize_'+str(scnt)+'dist_'+str(th)+'run_'+str(run)
+                print filestr
+                self.do_experiment(a, coach, scnt, th, filestr)
+                time.sleep(20)
+
+
+  def do_experiment(self, assignment_id, userid, theme_sentence_size, distance_threshold, filestr):
     submissionQuery = Submission.query.filter_by(assignmentID=assignment_id)
     submissions = SubmissionSchema().dump(submissionQuery, many=True).data
     results = []
-    if serverAnnotator != None:
-      userid = serverAnnotator
-    phrase2vecresult = []
-    f2 = open('essayiqgold.txt', "w")
+
+    f2 = open('essayiqgold_' + str(assignment_id) + filestr+'.txt', "w")
     sentence_cnt = [0]
+
+    #EssayIQ Model
+    module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
+    #@param ["https://tfhub.dev/google/universal-sentence-encoder/4","https://tfhub.dev/google/universal-sentence-encoder-large/5"]
+    model = hub.load(module_url)
+    print("module %s loaded" % module_url)
+
+    themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
+    themes = ThemeSchema().dump(themeQuery, many=True).data
+    candidate_sentences = []  # these sentences are used as reference by essayiq
+    # x = [(theme['themeName'], theme['themeSentences'], theme['color'], theme['id']) for theme in themes]
+    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid, candidate_sentences, candidate_sentence_size=theme_sentence_size),
+          theme['color'], theme['id']) for theme in themes]
+
     for submission in submissions:
-      results.append(self.getData(submission['submissionID'], assignment_id, userid, sentence_cnt))
-      phrase2vecresult.append(self.getDataPhrase2Vec(submission['submissionID'], assignment_id, userid))
+      results.append(self.getData(submission['submissionID'], x, sentence_cnt, model=model, distance_threshold=distance_threshold))
       goldstandardannotations = GetAnnotation().getgoldstandard(submission['submissionID'], userid)
       for annotation in goldstandardannotations:
         dic = dict()
@@ -799,15 +860,14 @@ class WholeSubmissionHighlight(Resource):
         dic['themeid'] = annotation['selectedTheme']
         theme = Theme.query.get_or_404(annotation['selectedTheme'])
         dic['color'] = theme.color
+        dic['themeMarker'] = theme.themeName
         dic['sentenceindex'] = annotation['sentenceIndex']
         dic['submissionname'] = submission['submissionName']
         f2.write(json.dumps(dic)+'\n')
     f2.close()
-    print 'sentence count', sentence_cnt[0]
-    #deleteUSE_model()
-
-
-    f = open("essayiq.txt", "w")
+    print 'assignment_id', assignment_id, 'sentence count', sentence_cnt[0]
+    del model
+    f = open("essayiq_" + str(assignment_id)+ filestr +'.txt', "w")
     for res in results:
       for i in range(len(res['sentences'])):
         dic = dict()
@@ -819,9 +879,15 @@ class WholeSubmissionHighlight(Resource):
         dic['sentenceindex'] = i
         f.write(json.dumps(dic)+'\n')
 
-    # for submission in submissions:
-    # phrase2vecresult.append(self.getDataPhrase2Vec(submission['submissionID'], assignment_id, userid))
-    f3 = open('phrase2vec.txt', "w")
+    #-----------phrase2vec model experiment--------------------
+    '''candidate_sentences_phrasemodel = []
+    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid, candidate_sentences_phrasemodel),
+          theme['color'], theme['id']) for theme in themes]'''
+    #same candidate sentences for both essayiq and phrase2vec, so no use of above two lines
+    phrase2vecresult = []
+    for submission in submissions:
+      phrase2vecresult.append(self.getDataPhrase2Vec(submission['submissionID'], x, distance_threshold=distance_threshold))
+    f = open('phrase2vec_' + str(assignment_id) + filestr +'.txt', "w")
     for res in phrase2vecresult:
       for i in range(len(res['sentences'])):
         dic = dict()
@@ -831,7 +897,202 @@ class WholeSubmissionHighlight(Resource):
         dic['submissionname'] = res['submissionName']
         dic['themeid'] = res['themeids'][i]
         dic['sentenceindex'] = i
-        f3.write(json.dumps(dic)+'\n')
+        f.write(json.dumps(dic)+'\n')
+    f = open("candidate_sentences_" + str(assignment_id)+ filestr + '.txt', "w")
+    for sent in candidate_sentences:
+      dic = dict()
+      dic['submissionname'] = sent[0]
+      dic['sentenceindex'] = sent[1]
+      f.write(json.dumps(dic) + '\n')
+
+    return results
+
+
+  def get(self, assignment_id, userid):
+    submissionQuery = Submission.query.filter_by(assignmentID=assignment_id)
+    submissions = SubmissionSchema().dump(submissionQuery, many=True).data
+    results = []
+    '''if userid == 3: #shadek
+      self.generateresults()'''
+    if serverAnnotator != None:
+      userid = serverAnnotator
+
+    f2 = open('essayiqgold_' + str(assignment_id) +'.txt', "w")
+    sentence_cnt = [0]
+
+    '''res1 = GetAnnotation().interannotatoragreement(7,8,1)
+    print 'total 1', len(res1)
+    for size in [50, 75, 100, 125]:
+      if size > len(res1):
+        break
+      scores = []
+      for exp in range(0,100):
+        random.shuffle(res1)
+        v1 = [t[0] for t in res1[0:size]]
+        v2 = [t[1] for t in res1[0:size]]
+        cohen_score = cohen_kappa_score(v1, v2)
+        scores.append(cohen_score)
+      scores = np.array(scores)
+      print 'assignment', 1, 'size: ', size, 'kappa score', scores.mean(), '+-', scores.std()'''
+    '''res2 = GetAnnotation().interannotatoragreement(7, 8, 2)
+    print 'total 2', len(res2)
+    for size in [50, 75, 100, 125]:
+      if size > len(res2):
+        break
+      scores = []
+      for exp in range(0, 100):
+        random.shuffle(res2)
+        v1 = [t[0] for t in res2[0:size]]
+        v2 = [t[1] for t in res2[0:size]]
+        cohen_score = cohen_kappa_score(v1, v2)
+        scores.append(cohen_score)
+      scores = np.array(scores)
+      print 'assignment 2', 'size: ', size, 'kappa score', scores.mean(), '+-', scores.std()'''
+
+    '''res3 = GetAnnotation().interannotatoragreement(7, 8, 3)
+    print 'total 3', len(res3)
+    for size in [50, 75, 100, 125]:
+      if size > len(res3):
+        break
+      scores = []
+      for exp in range(0, 100):
+        random.shuffle(res3)
+        v1 = [t[0] for t in res3[0:size]]
+        v2 = [t[1] for t in res3[0:size]]
+        cohen_score = cohen_kappa_score(v1, v2)
+        scores.append(cohen_score)
+      scores = np.array(scores)
+      print 'assignment 3', 'size: ', size, 'kappa score', scores.mean(), '+-', scores.std()'''
+
+    #Human-Human agreement on essay level
+    res1 = GetAnnotation().interannotatoragreementsentencelevel(7, 8, 1)
+    print 'total 1', len(res1)
+    for size in [50, 75, 100, 125]:
+      if size > len(res1):
+        break
+      scores = []
+      for exp in range(0, 1):
+        random.shuffle(res1)
+        v = [t for t in res1[0:size]]
+        essay_level_themes_coach1 = dict()
+        essay_level_themes_coach2 = dict()
+        for i, val in enumerate(v):
+          if val[2] in essay_level_themes_coach1:
+            essay_level_themes_coach1[val[2]].append(val[0])
+            essay_level_themes_coach2[val[2]].append(val[1])
+          else:
+            essay_level_themes_coach1[val[2]] = [val[0]]
+            essay_level_themes_coach2[val[2]] = [val[1]]
+        human1values = []
+        human2values = []
+        human1values2 = []  # this array takes care of how many sentences contain a certain theme
+        human2values2 = []  # this array takes care of how many sentences contain a certain theme
+        themelabels = ['Culture in a working environment', 'Learning', 'Non-blaming culture',
+                       'Administrative leadership', 'Humility']
+        #themelabels = ['Fast Paced environment','Short Staffing','Home life responsibilities','Negative Impact on Patient Safety','Utilization of IAMSAFE Checklist']
+        #themelabels = ['Examples of bad designs similar to the "tricky doors"', 'Impacts from bad designs',
+         #              'Barriers to improvement to non-user-friendly design',
+          #             'Mis-attribution of user errors caused by bad designs',
+           #            'Workplace examples of bad and good design']
+        thememap = dict()
+        for i, label in enumerate(themelabels):
+          thememap[label] = i
+        for submission in essay_level_themes_coach1:
+          arr = [0] * len(themelabels)
+          arr2 = [0] * len(themelabels)
+          for theme in essay_level_themes_coach1[submission]:
+            themerow = Theme.query.get_or_404(theme)
+            arr[thememap[themerow.themeName]] = 1
+            arr2[thememap[themerow.themeName]] += 1
+          human1values.extend(arr)
+          human1values2.extend(arr2)
+
+        for submission in essay_level_themes_coach2:
+          arr = [0] * len(themelabels)
+          arr2 = [0] * len(themelabels)
+          for theme in essay_level_themes_coach2[submission]:
+            themerow = Theme.query.get_or_404(theme)
+            arr[thememap[themerow.themeName]] = 1
+            arr2[thememap[themerow.themeName]] += 1
+          human2values.extend(arr)
+          human2values2.extend(arr2)
+        print(len(human1values), len(human2values))
+        cohen_score = cohen_kappa_score(human1values, human2values)
+        print 'size:' , size
+        print('human-human essay level kappa score: ', cohen_score)
+
+        cohen_score = cohen_kappa_score(human1values2, human2values2, weights='quadratic')
+        print('human-human essay level  kappa score (with weights): ', cohen_score)
+        #cohen_score = cohen_kappa_score(v1, v2)
+        #scores.append(cohen_score)
+        #scores = np.array(scores)
+
+    #EssayIQ Model
+    module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
+    #@param ["https://tfhub.dev/google/universal-sentence-encoder/4","https://tfhub.dev/google/universal-sentence-encoder-large/5"]
+    model = hub.load(module_url)
+    print("module %s loaded" % module_url)
+
+    themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
+    themes = ThemeSchema().dump(themeQuery, many=True).data
+    candidate_sentences = []  # these sentences are used as reference by essayiq
+    # x = [(theme['themeName'], theme['themeSentences'], theme['color'], theme['id']) for theme in themes]
+    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid, candidate_sentences),
+          theme['color'], theme['id']) for theme in themes]
+
+    for submission in submissions:
+      results.append(self.getData(submission['submissionID'], x, sentence_cnt, model=model))
+      goldstandardannotations = GetAnnotation().getgoldstandard(submission['submissionID'], userid)
+      for annotation in goldstandardannotations:
+        dic = dict()
+        dic['sentence'] = annotation['sentence']
+        dic['themeid'] = annotation['selectedTheme']
+        theme = Theme.query.get_or_404(annotation['selectedTheme'])
+        dic['color'] = theme.color
+        dic['themeMarker'] = theme.themeName
+        dic['sentenceindex'] = annotation['sentenceIndex']
+        dic['submissionname'] = submission['submissionName']
+        f2.write(json.dumps(dic)+'\n')
+    f2.close()
+    print 'assignment_id', assignment_id, 'sentence count', sentence_cnt[0]
+    del model
+    f = open("essayiq_" + str(assignment_id) +'.txt', "w")
+    for res in results:
+      for i in range(len(res['sentences'])):
+        dic = dict()
+        dic['sentence'] = res['sentences'][i]
+        dic['themeMarker'] = res['themeMarkers'][i]
+        dic['color'] = res['colors'][i]
+        dic['submissionname'] = res['submissionName']
+        dic['themeid'] = res['themeids'][i]
+        dic['sentenceindex'] = i
+        f.write(json.dumps(dic)+'\n')
+
+    #-----------phrase2vec model experiment--------------------
+    '''candidate_sentences_phrasemodel = []
+    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid, candidate_sentences_phrasemodel),
+          theme['color'], theme['id']) for theme in themes]'''
+    #same candidate sentences for both essayiq and phrase2vec, so no use of above two lines
+    phrase2vecresult = []
+    for submission in submissions:
+      phrase2vecresult.append(self.getDataPhrase2Vec(submission['submissionID'], x))
+    f = open('phrase2vec_' + str(assignment_id) +'.txt', "w")
+    for res in phrase2vecresult:
+      for i in range(len(res['sentences'])):
+        dic = dict()
+        dic['sentence'] = res['sentences'][i]
+        dic['themeMarker'] = res['themeMarkers'][i]
+        dic['color'] = res['colors'][i]
+        dic['submissionname'] = res['submissionName']
+        dic['themeid'] = res['themeids'][i]
+        dic['sentenceindex'] = i
+        f.write(json.dumps(dic)+'\n')
+    f = open("candidate_sentences_" + str(assignment_id) + '.txt', "w")
+    for sent in candidate_sentences:
+      dic = dict()
+      dic['submissionname'] = sent[0]
+      dic['sentenceindex'] = sent[1]
+      f.write(json.dumps(dic) + '\n')
 
     return results
 
@@ -844,14 +1105,11 @@ class WholeSubmissionHighlight(Resource):
     return [lemmatizer.lemmatize(token) for token in sentence.split() if ((token not in STOP_WORDS)
                                                                           and (not token.isdigit()))]
   # for each submission sentence, this function returns themeName or No theme
-  def getData(self, submission_id, assignment_id, userid, sentence_cnt=None):
-    themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
-    themes = ThemeSchema().dump(themeQuery, many=True).data
+  def getData(self, submission_id, x, sentence_cnt=None, model=None): #, distance_threshold = None
+    def embed(input):
+      return model(input)
     submission = Submission.query.get_or_404(submission_id)
     essay = submission.submissionBody
-
-    #x = [(theme['themeName'], theme['themeSentences'], theme['color'], theme['id']) for theme in themes]
-    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid), theme['color'], theme['id']) for theme in themes]
     submission_sentences = self.get_sentence_array(essay)
     if sentence_cnt is not None:
       sentence_cnt[0] += len(submission_sentences)
@@ -882,11 +1140,18 @@ class WholeSubmissionHighlight(Resource):
         themeMarker.append("No theme")
         themeColors.append("None")
         selectedThemeSentences.append(("No theme sentence", -1))
-    return {'sentences': submission_sentences, 'themeMarkers': themeMarker, 'colors': themeColors, 'themes': themes,
+    return {'sentences': submission_sentences, 'themeMarkers': themeMarker, 'colors': themeColors,
             'submissionName': submission.submissionName, 'themeSentences': [t[0] for t in selectedThemeSentences], 'themeids': [t[1] for t in selectedThemeSentences]}
 
+  def sentence_to_bi_grams(self, sentence):
+    if phrase_model_name == '4gram':
+      return phrases_model_4gram[sentence]
+    else:
+      return phrases_model_trigram[sentence]
+
+
   # for each submission sentence, this function returns themeName or No theme
-  def getDataPhrase2Vec(self, submission_id, assignment_id, userid):
+  def getDataPhrase2Vec(self, submission_id, x): #, distance_threshold=None
 
     #_cache = LRUCache(cache_capacity)
 
@@ -898,14 +1163,9 @@ class WholeSubmissionHighlight(Resource):
         embedding = np.zeros(embeddings.shape[1], )
       return embedding
 
-    themeQuery = Theme.query.filter_by(assignment_id=assignment_id)
-    themes = ThemeSchema().dump(themeQuery, many=True).data
     submission = Submission.query.get_or_404(submission_id)
     essay = submission.submissionBody
 
-    # x = [(theme['themeName'], theme['themeSentences'], theme['color'], theme['id']) for theme in themes]
-    x = [(theme['themeName'], GetAnnotation().getthemesentencebyuser(theme['id'], userid), theme['color'], theme['id'])
-         for theme in themes]
     submission_sentences = self.get_sentence_array(essay)
     theme_sentences_array = [self.get_sentence_array(item[1]) for item in x]
     num_themes = len(theme_sentences_array)
@@ -914,13 +1174,14 @@ class WholeSubmissionHighlight(Resource):
       phrasevector = []
       for theme_sentence in theme_sentences_array[i]:
         tokenized_sentence = self.tokenize(theme_sentence)
-        phrasevector.append(get_embedding_for_words(tokenized_sentence))
+        #parsed_sentence = self.sentence_to_bi_grams(tokenized_sentence)
+        phrasevector.append(get_embedding_for_words(self.sentence_to_bi_grams(tokenized_sentence)))
       theme_embedding.append(phrasevector)
     themeMarker = []
     themeColors = []
     selectedThemeSentences = []
     for sent in submission_sentences:
-      candidate_embedding = get_embedding_for_words(self.tokenize(sent)) #embed([sent])
+      candidate_embedding = get_embedding_for_words(self.sentence_to_bi_grams(self.tokenize(sent))) #embed([sent])
       most_similar_sentences = []
       for i in range(0, len(theme_embedding)):  # for each theme
         sent_embeddings = np.array(theme_embedding[i])
@@ -938,7 +1199,7 @@ class WholeSubmissionHighlight(Resource):
         themeMarker.append("No theme")
         themeColors.append("None")
         selectedThemeSentences.append(("No theme sentence", -1))
-    return {'sentences': submission_sentences, 'themeMarkers': themeMarker, 'colors': themeColors, 'themes': themes,
+    return {'sentences': submission_sentences, 'themeMarkers': themeMarker, 'colors': themeColors,
             'submissionName': submission.submissionName, 'themeSentences': [t[0] for t in selectedThemeSentences],
             'themeids': [t[1] for t in selectedThemeSentences]}
   def get_sentence_array(self, essaystr):
