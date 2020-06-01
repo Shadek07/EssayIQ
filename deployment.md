@@ -12,7 +12,7 @@ A snapshot of EssayIQ dns record is provided.
 PostgreSQL installation process in server for EssayIQ is done by following this [blog](https://linuxize.com/post/how-to-install-postgresql-on-ubuntu-18-04/).
 
 The following commands need to execute during the process:
-
+```
 sudo ufw allow ‘Nginx HTTP’
 
 sudo ufw enable
@@ -26,19 +26,25 @@ sudo ufw allow ssh
 sudo ufw enable
 
 sudo ufw status
+```
 
 ### Inside postgres command prompt:
-
-postgres=# CREATE DATABASE conceptvectorDB; (database name is same as conceptvector project)
-
+```
+postgres=# CREATE DATABASE conceptvectorDB;
+```
+(database name is same as conceptvector project)
+```
 grant all privileges on database conceptvectorDB to shadek;
 
 sudo nano /etc/postgresql/10/main/postgresql.conf
+```
 -----Connection Settings---
+```
 listen_addresses = '*'     # what IP address(es) to listen on;
-
+```
 ### Creating python env and installing packages:
 
+```
 conda create -n essayiq python=2.7 anaconda
 
 sudo apt-get install python-psycopg2
@@ -75,9 +81,10 @@ sudo npm install phantomjs-prebuilt@2.1.7 --ignore-scripts (if you see phantom r
 sudo npm install phantomjs-prebuilt@2.1.7 -g --unsafe-perm
 
 npm i -g phantomjs-prebuilt --unsafe-perm --silent
-
+```
 
 ### before bower install:
+```
 sudo chown -R shadek:shadek ~/.config
 
 sudo chown -R shadek:shadek ~/.cache
@@ -85,21 +92,26 @@ sudo chown -R shadek:shadek ~/.cache
 bower install
 
 grunt build --force
+```
 
-
+**postgreSQL user password change**
+```
 sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+```
 **delete ‘migrations' folder and delete all the rows from ‘alembic_version’ table (DELETE from alembic_version;). then run the followings inside server directory:**
+```
 python manage.py db init
 
 python manage.py db migrate
 
 python manage.py db upgrade
-
+```
 
 **(then replace content of env.py with conceptvector/env.py)**
 
 Restart postgresql service if you change any settings like password or authentication method.
 
+```
 sudo ufw allow 5000
 
 sudo ufw allow 9000
@@ -111,7 +123,13 @@ export APP_SETTINGS=config.DevelopmentConfig
 export DATABASE_URL=postgresql://postgres:postgres@localhost/conceptvectorDB
 
 sudo ufw allow 'Nginx HTTP'
+```
 
+## References:
+[make domain work](https://www.digitalocean.com/community/questions/how-do-i-make-my-domain-work)
 
+[domain hosting](https://www.digitalocean.com/community/questions/how-do-i-set-up-my-domain-hosting)
+
+[upgrade legacy metric](https://www.digitalocean.com/docs/monitoring/how-to/upgrade-legacy-agent/)
 
 
